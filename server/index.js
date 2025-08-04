@@ -20,7 +20,7 @@ mongoose
     .catch(err => console.log('MongoDB Connection Error:', err));
 
 // Use Routes
-app.use('/api/items', require('./routes/api/items'));
+
 app.use('/api/users', require('./routes/api/users'));
 app.use('/api/mindmaps', require('./routes/api/mindmaps'));
 app.use('/api/nodes', require('./routes/api/nodes'));

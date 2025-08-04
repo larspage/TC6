@@ -157,38 +157,6 @@ router.post('/forgot-password', [
         await user.save();
 
         // TODO: Send email with reset link
-        // const transporter = nodemailer.createTransport({
-        //     service: 'Gmail',
-        //     auth: {
-        //         user: process.env.EMAIL_USERNAME,
-        //         pass: process.env.EMAIL_PASSWORD,
-        //     },
-        // });
-
-        // const mailOptions = {
-        //     to: user.email,
-        //     from: 'passwordreset@demo.com',
-        //     subject: 'Password Reset',
-        //     text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.
-
-` +
-        //           `Please click on the following link, or paste this into your browser to complete the process:
-
-` +
-        //           `http://${req.headers.host}/reset-password/${token}
-
-` +
-        //           `If you did not request this, please ignore this email and your password will remain unchanged.
-`,
-        // };
-
-        // transporter.sendMail(mailOptions, (err) => {
-        //     if (err) {
-        //         console.error('There was an error: ', err);
-        //         return res.status(500).json({ msg: 'Error sending email' });
-        //     }
-        //     res.status(200).json({ msg: 'Password reset email sent' });
-        // });
         res.status(200).json({ msg: 'Password reset email sent (email sending is not yet configured)' });
 
     } catch (err) {
