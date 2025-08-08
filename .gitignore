@@ -70,7 +70,7 @@ temp/
 yarn.lock
 
 # Cursor IDE
-.cursor/
+# .cursor/
 
 # Build artifacts
 build/
