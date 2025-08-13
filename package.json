@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build:server": "tsc -p server",
+    "dev:server:ts": "cross-env PORT=3671 ts-node-dev --respawn --transpile-only server/src/index.ts",
     "start": "node server/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "cross-env NODE_ENV=test jest --runInBand",
     "dev:server": "cross-env PORT=3671 node server/index.js",
     "dev:client": "npm start --prefix client",
     "kill-ports": "node scripts/kill-ports.js",
@@ -16,19 +18,30 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@types/d3": "^7.4.3",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
+    "d3": "^7.9.0",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "express-validator": "^7.2.1",
+    "framer-motion": "^12.23.12",
     "jsonwebtoken": "^9.0.2",
+    "lodash.debounce": "^4.0.8",
     "mongoose": "^8.16.5",
     "morgan": "^1.10.1",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.19",
     "concurrently": "^9.2.0",
-    "cross-env": "^10.0.0"
+    "cross-env": "^10.0.0",
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^8.14.0",
+    "supertest": "^6.3.3",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.2"
   }
 }

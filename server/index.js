@@ -85,6 +85,7 @@ app.use('/api/users', require('./routes/api/users'));
 app.use('/api/mindmaps', require('./routes/api/mindmaps'));
 app.use('/api/nodes', require('./routes/api/nodes'));
 app.use('/api/connections', require('./routes/api/connections'));
+app.use('/api/logs', require('./routes/logs'));
 
 // Health check endpoint with logging
 app.get('/health', (req, res) => {
@@ -152,10 +153,15 @@ if (process.env.NODE_ENV === 'production') {
 
 const port = process.env.PORT || 3671;
 
-app.listen(port, () => {
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
     console.log(`\nBackend server started on port ${port}`);
     console.log('---');
     console.log(`Backend Health Check: http://localhost:${port}/health`);
     console.log('Frontend available at: http://localhost:3670');
-    console.log('---\n');
-});
+    console.log('---\\n');
+  });
+}
+
+// Export app for testing without starting a second server
+module.exports = app;
