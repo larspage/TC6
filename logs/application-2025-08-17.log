@@ -17,3 +17,11 @@
 {"level":"warn","message":"JWT_SECRET not found in env; using development default from config/keys.js","service":"thoughtcatcher6","timestamp":"2025-08-17 12:13:03"}
 {"level":"info","message":"Mongoose connected to DB","service":"thoughtcatcher6","timestamp":"2025-08-17 12:13:03"}
 {"level":"info","message":"MongoDB connected successfully","service":"thoughtcatcher6","timestamp":"2025-08-17 12:13:03"}
+{"level":"info","message":"Starting ThoughtCatcher6 server...","service":"thoughtcatcher6","timestamp":"2025-08-17 13:28:09"}
+{"level":"warn","message":"JWT_SECRET not found in env; using development default from config/keys.js","service":"thoughtcatcher6","timestamp":"2025-08-17 13:28:09"}
+{"level":"info","message":"Mongoose connected to DB","service":"thoughtcatcher6","timestamp":"2025-08-17 13:28:09"}
+{"level":"info","message":"MongoDB connected successfully","service":"thoughtcatcher6","timestamp":"2025-08-17 13:28:09"}
+{"level":"info","message":"Starting ThoughtCatcher6 server...","service":"thoughtcatcher6","timestamp":"2025-08-17 13:29:08"}
+{"level":"warn","message":"JWT_SECRET not found in env; using development default from config/keys.js","service":"thoughtcatcher6","timestamp":"2025-08-17 13:29:08"}
+{"level":"info","message":"Mongoose connected to DB","service":"thoughtcatcher6","timestamp":"2025-08-17 13:29:08"}
+{"level":"info","message":"MongoDB connected successfully","service":"thoughtcatcher6","timestamp":"2025-08-17 13:29:08"}
