@@ -1,0 +1,60 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Repos\\TC6\\logs\\.285a0ce03e8067a485f877eda744406843c5f039-audit.json",
+    "files": [
+        {
+            "date": 1754513372984,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-06.log",
+            "hash": "732b834e8e296b42a630de09b6203e5237fad124a74e73ce9ddc163b3ba61b47"
+        },
+        {
+            "date": 1754584322483,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-07.log",
+            "hash": "7ea6d52590d813d2a6ae40e6fa669ceeff16dc3dee79674492680a4bc8da19a4"
+        },
+        {
+            "date": 1754658306351,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-08.log",
+            "hash": "ba0f2c66276acd42be4bc02da1d5cea28c45ee6280360e876baa9cbe203d9716"
+        },
+        {
+            "date": 1754926548994,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-11.log",
+            "hash": "cd5d69d025f2bae8a5f507509a672acd1776e0a6652e07d407f639c23121b766"
+        },
+        {
+            "date": 1755027808665,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-12.log",
+            "hash": "061965714e298a5fec7d7d3f9ab9bf6c0b8621c67b93f8b71aeaf9f53d9c51c7"
+        },
+        {
+            "date": 1755096092473,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-13.log",
+            "hash": "e97f6de91eab854a7dc2aba4b69b4479284dffb5c12f7c8992469543229238ed"
+        },
+        {
+            "date": 1755179859856,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-14.log",
+            "hash": "54d48e523378ad7a3b327e88efdb1482ef065acb3325ab1d5412c05f502db069"
+        },
+        {
+            "date": 1755270808841,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-15.log",
+            "hash": "97ff6b7bf8641d0436819895452d807361327a3afab3f8ce0931ef8b82c42512"
+        },
+        {
+            "date": 1755353241672,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-16.log",
+            "hash": "7090c515bcd7a7df6ba611f93992f5596e7e6899e4481a8a4a84d7a4e02bc04c"
+        },
+        {
+            "date": 1755434079319,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-17.log",
+            "hash": "926f2c06a4002144e45393e85f4ca0c7392a342a246e7056ee94fe0352d75318"
+        }
+    ],
+    "hashType": "sha256"
+}

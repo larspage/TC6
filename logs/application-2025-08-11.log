@@ -1,0 +1,4 @@
+{"level":"info","message":"Starting ThoughtCatcher6 server...","service":"thoughtcatcher6","timestamp":"2025-08-11 11:35:49"}
+{"level":"warn","message":"JWT_SECRET not found in env; using development default from config/keys.js","service":"thoughtcatcher6","timestamp":"2025-08-11 11:35:49"}
+{"level":"info","message":"Mongoose connected to DB","service":"thoughtcatcher6","timestamp":"2025-08-11 11:35:50"}
+{"level":"info","message":"MongoDB connected successfully","service":"thoughtcatcher6","timestamp":"2025-08-11 11:35:50"}
