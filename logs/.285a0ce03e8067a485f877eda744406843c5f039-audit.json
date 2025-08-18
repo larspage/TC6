@@ -54,6 +54,11 @@
             "date": 1755434079319,
             "name": "C:\\Repos\\TC6\\logs\\application-2025-08-17.log",
             "hash": "926f2c06a4002144e45393e85f4ca0c7392a342a246e7056ee94fe0352d75318"
+        },
+        {
+            "date": 1755526344496,
+            "name": "C:\\Repos\\TC6\\logs\\application-2025-08-18.log",
+            "hash": "568cb9f973699a019865cb1c0739f2e32458a7059ffed40737f93a18708c64f3"
         }
     ],
     "hashType": "sha256"
