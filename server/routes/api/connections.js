@@ -6,6 +6,23 @@ const { check, validationResult } = require('express-validator');
 const Connection = require('../../src/models/Connection');
 const MindMap = require('../../src/models/MindMap');
 
+// @route   GET api/connections/:mindmap_id
+// @desc    Get all connections for a mind map
+// @access  Private
+router.get('/:mindmap_id', auth, async (req, res) => {
+  try {
+    const mindMap = await MindMap.findById(req.params.mindmap_id);
+    if (!mindMap) return res.status(404).json({ msg: 'Mind map not found' });
+    if (mindMap.user_id.toString() !== req.user.id)
+      return res.status(401).json({ msg: 'User not authorized' });
+    const connections = await Connection.find({ mindmap_id: req.params.mindmap_id });
+    res.json(connections);
+  } catch (err) {
+    if (err.kind === 'ObjectId') return res.status(404).json({ msg: 'Mind map not found' });
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   POST api/connections
 // @desc    Create a new connection between two nodes
 // @access  Private

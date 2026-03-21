@@ -76,3 +76,14 @@ yarn.lock
 # Build artifacts
 build/
 dist/ 
+# Logs
+logs/
+
+# Zoe context
+CLAUDE.md
+
+# Dev artifacts
+ErrorPics/
+referenceImages/
+my-ftdc.pp
+my-ftdc.te

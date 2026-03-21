@@ -45,7 +45,22 @@ const NodeSchema = new Schema({
   level: {
     type: Number,
     default: 0
-  }
+  },
+  thought_type: {
+    type: String,
+    enum: ['idea', 'task', 'note', 'question'],
+    default: 'idea'
+  },
+  description: {
+    type: String,
+    default: '',
+    maxlength: 2000,
+    trim: true,
+  },
+  tags: {
+    type: [String],
+    default: [],
+  },
 }, { timestamps: true });
 
 NodeSchema.index({ mindmap_id: 1 });

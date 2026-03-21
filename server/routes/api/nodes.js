@@ -103,13 +103,16 @@ router.put(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { text, position, styling } = req.body;
+    const { text, position, styling, description, tags, thought_type } = req.body;
 
     // Build node object
     const nodeFields = {};
     if (text) nodeFields.text = text;
     if (position) nodeFields.position = position;
     if (styling) nodeFields.styling = styling;
+    if (description !== undefined) nodeFields.description = description;
+    if (tags !== undefined) nodeFields.tags = tags;
+    if (thought_type) nodeFields.thought_type = thought_type;
     nodeFields.updated_at = Date.now();
 
     try {
