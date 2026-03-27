@@ -19,7 +19,7 @@ const ConnectionSchema = new Schema({
   },
   connection_type: {
     type: String,
-    enum: ['parent-child', 'manual'],
+    enum: ['parent-child', 'manual', 'mention'],
     default: 'manual'
   },
   styling: {

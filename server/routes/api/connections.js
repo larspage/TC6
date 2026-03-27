@@ -5,6 +5,7 @@ const { check, validationResult } = require('express-validator');
 
 const Connection = require('../../src/models/Connection');
 const MindMap = require('../../src/models/MindMap');
+const Node = require('../../src/models/Node');
 
 // @route   GET api/connections/:mindmap_id
 // @desc    Get all connections for a mind map
@@ -146,6 +147,47 @@ router.delete('/:id', auth, async (req, res) => {
     if (err.kind === 'ObjectId') {
       return res.status(404).json({ msg: 'Connection not found' });
     }
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   GET api/connections/node/:node_id
+// @desc    Get inbound and outbound connections for a specific node
+// @access  Private
+// Returns: { inbound: [Connection], outbound: [Connection] }
+// inbound = connections where to_node_id === node_id (backlinks)
+// outbound = connections where from_node_id === node_id (manual + mention links this node points to)
+router.get('/node/:node_id', auth, async (req, res) => {
+  try {
+    const node = await Node.findById(req.params.node_id);
+    if (!node) return res.status(404).json({ msg: 'Node not found' });
+
+    const mindMap = await MindMap.findById(node.mindmap_id);
+    if (!mindMap) return res.status(404).json({ msg: 'Mind map not found' });
+
+    if (mindMap.user_id.toString() !== req.user.id) {
+      return res.status(401).json({ msg: 'User not authorized' });
+    }
+
+    const connections = await Connection.find({
+      $or: [
+        { from_node_id: req.params.node_id },
+        { to_node_id: req.params.node_id }
+      ],
+      connection_type: { $in: ['manual', 'mention'] }
+    });
+
+    const inbound = connections.filter(
+      c => c.to_node_id.toString() === req.params.node_id
+    );
+    const outbound = connections.filter(
+      c => c.from_node_id.toString() === req.params.node_id
+    );
+
+    res.json({ inbound, outbound });
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === 'ObjectId') return res.status(404).json({ msg: 'Node not found' });
     res.status(500).send('Server Error');
   }
 });

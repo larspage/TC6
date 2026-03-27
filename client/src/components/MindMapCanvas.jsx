@@ -1,6 +1,8 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback, useReducer } from 'react';
 import * as d3 from 'd3';
 import { updateNode } from '../api.js';
+import DescriptionEditor from './DescriptionEditor.jsx';
+import LinksPanel from './LinksPanel.jsx';
 
 // ─── Node dimensions by hop distance from active thought ─────────────────────
 const HOP_STYLE = {
@@ -95,30 +97,51 @@ function Tooltip({ node, pos }) {
 }
 
 // ─── Edit panel ───────────────────────────────────────────────────────────────
-function EditPanel({ node, token, onSave, onClose }) {
+function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCreated, onNodeClick, onConnectionsChanged }) {
   const [text, setText]           = useState(node.text);
   const [type, setType]           = useState(node.thought_type || 'idea');
   const [desc, setDesc]           = useState(node.description || '');
   const [tags, setTags]           = useState((node.tags || []).join(', '));
   const [saving, setSaving]       = useState(false);
+  const [savedHint, setSavedHint] = useState(false);
   const [error, setError]         = useState(null);
+  const autosaveTimer             = useRef(null);
 
-  async function handleSave() {
+  async function doSave(fields) {
     setSaving(true);
     setError(null);
     try {
-      const updated = await updateNode(token, node._id, {
-        text: text.trim(),
-        thought_type: type,
-        description: desc.trim(),
-        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      });
+      const updated = await updateNode(token, node._id, fields);
       onSave(updated);
+      setSavedHint(true);
+      setTimeout(() => setSavedHint(false), 1500);
     } catch (e) {
       setError(e.message);
+    } finally {
       setSaving(false);
     }
   }
+
+  function buildFields(overrides = {}) {
+    return {
+      text: (overrides.text ?? text).trim(),
+      thought_type: overrides.type ?? type,
+      description: (overrides.desc ?? desc).trim(),
+      tags: (overrides.tags ?? tags).split(',').map(t => t.trim()).filter(Boolean),
+    };
+  }
+
+  function scheduleAutosave(overrides = {}) {
+    clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => doSave(buildFields(overrides)), 2000);
+  }
+
+  function handleBlurSave() {
+    clearTimeout(autosaveTimer.current);
+    doSave(buildFields());
+  }
+
+  useEffect(() => () => clearTimeout(autosaveTimer.current), []);
 
   const input = {
     width: '100%', boxSizing: 'border-box',
@@ -141,38 +164,74 @@ function EditPanel({ node, token, onSave, onClose }) {
     }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #1E293B', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ color: '#42B4E6', fontWeight: 700, fontSize: 14 }}>Edit Thought</span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: '0 4px' }}>×</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {savedHint && <span style={{ color: '#68D391', fontSize: 11 }}>Saved</span>}
+          {saving    && <span style={{ color: '#64748B', fontSize: 11 }}>Saving…</span>}
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: '0 4px' }}>×</button>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 20px' }}>
         <label style={label}>Title</label>
-        <input value={text} onChange={e => setText(e.target.value)} style={input} />
+        <input
+          value={text}
+          onChange={e => { setText(e.target.value); scheduleAutosave({ text: e.target.value }); }}
+          onBlur={handleBlurSave}
+          style={input}
+        />
 
         <label style={label}>Type</label>
-        <select value={type} onChange={e => setType(e.target.value)} style={input}>
+        <select
+          value={type}
+          onChange={e => { setType(e.target.value); scheduleAutosave({ type: e.target.value }); }}
+          onBlur={handleBlurSave}
+          style={input}
+        >
           {['idea', 'task', 'note', 'question'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
 
         <label style={label}>Description</label>
-        <textarea value={desc} onChange={e => setDesc(e.target.value)}
-          rows={4} style={{ ...input, resize: 'vertical' }} />
+        <DescriptionEditor
+          value={desc}
+          onChange={v => { setDesc(v); scheduleAutosave({ desc: v }); }}
+          nodes={allNodes}
+          token={token}
+          mindmapId={mindmapId}
+          onNodeCreated={onNodeCreated}
+        />
 
         <label style={label}>Tags (comma-separated)</label>
-        <input value={tags} onChange={e => setTags(e.target.value)}
-          style={input} placeholder="strategy, priority, q1" />
+        <input
+          value={tags}
+          onChange={e => { setTags(e.target.value); scheduleAutosave({ tags: e.target.value }); }}
+          onBlur={handleBlurSave}
+          style={input}
+          placeholder="strategy, priority, q1"
+        />
 
         {error && <div style={{ color: '#FC8181', fontSize: 12, marginTop: 10 }}>{error}</div>}
+
+        <div style={{ borderTop: '1px solid #1E293B', marginTop: 16, paddingTop: 12 }}>
+          <LinksPanel
+            nodeId={node._id}
+            mindmapId={mindmapId}
+            token={token}
+            allNodes={allNodes}
+            onNodeClick={(nodeId) => { onClose(); onNodeClick(nodeId); }}
+            onConnectionsChanged={onConnectionsChanged}
+          />
+        </div>
       </div>
 
       <div style={{ padding: '14px 20px', borderTop: '1px solid #1E293B', display: 'flex', gap: 10 }}>
-        <button onClick={handleSave} disabled={saving} style={{
+        <button onClick={() => { clearTimeout(autosaveTimer.current); doSave(buildFields()); }} disabled={saving} style={{
           flex: 1, background: '#2563EB', color: '#fff', border: 'none',
           borderRadius: 6, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
         }}>{saving ? 'Saving…' : 'Save'}</button>
         <button onClick={onClose} style={{
           background: '#1E293B', color: '#94A3B8', border: '1px solid #334155',
           borderRadius: 6, padding: '9px 16px', fontSize: 13, cursor: 'pointer',
-        }}>Cancel</button>
+        }}>Close</button>
       </div>
     </div>
   );
@@ -181,16 +240,17 @@ function EditPanel({ node, token, onSave, onClose }) {
 // ─── Main canvas ──────────────────────────────────────────────────────────────
 const MAX_HOPS = 2;
 
-export default function MindMapCanvas({ nodes, connections, token }) {
+export default function MindMapCanvas({ nodes, connections, token, mindmapId, onNodeCreated }) {
   const containerRef              = useRef(null);
   const [size, setSize]           = useState({ w: 0, h: 0 });
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [, tick]                  = useReducer(n => n + 1, 0);
-  const [activeNodeId, setActiveNodeId] = useState(null);
-  const [hoveredNode, setHoveredNode]   = useState(null);
-  const [tooltipPos, setTooltipPos]     = useState(null);
-  const [editMode, setEditMode]         = useState(false);
-  const [localNodes, setLocalNodes]     = useState(nodes);
+  const [activeNodeId, setActiveNodeId]       = useState(null);
+  const [hoveredNode, setHoveredNode]         = useState(null);
+  const [tooltipPos, setTooltipPos]           = useState(null);
+  const [editMode, setEditMode]               = useState(false);
+  const [localNodes, setLocalNodes]           = useState(nodes);
+  const [localConnections, setLocalConnections] = useState(connections);
 
   const simRef       = useRef(null);
   const posMap       = useRef({});
@@ -200,6 +260,7 @@ export default function MindMapCanvas({ nodes, connections, token }) {
   const sizeRef      = useRef({ w: 0, h: 0 });           // sync copy for clamp calc
 
   useEffect(() => { setLocalNodes(nodes); }, [nodes]);
+  useEffect(() => { setLocalConnections(connections); }, [connections]);
 
   // Set root as initial active node
   useEffect(() => {
@@ -224,14 +285,14 @@ export default function MindMapCanvas({ nodes, connections, token }) {
   // Adjacency map (undirected)
   const adjMap = useMemo(() => {
     const m = new Map();
-    for (const c of connections) {
+    for (const c of localConnections) {
       if (!m.has(c.from_node_id)) m.set(c.from_node_id, new Set());
       if (!m.has(c.to_node_id))   m.set(c.to_node_id, new Set());
       m.get(c.from_node_id).add(c.to_node_id);
       m.get(c.to_node_id).add(c.from_node_id);
     }
     return m;
-  }, [connections]);
+  }, [localConnections]);
 
   // BFS hop distances from active node
   const hopMap = useMemo(() =>
@@ -246,8 +307,8 @@ export default function MindMapCanvas({ nodes, connections, token }) {
 
   const visibleConns = useMemo(() => {
     const vis = new Set(visibleNodes.map(n => n._id));
-    return connections.filter(c => vis.has(c.from_node_id) && vis.has(c.to_node_id));
-  }, [visibleNodes, connections]);
+    return localConnections.filter(c => vis.has(c.from_node_id) && vis.has(c.to_node_id));
+  }, [visibleNodes, localConnections]);
 
   // D3 force simulation — restarts whenever visible subgraph or active node changes
   useEffect(() => {
@@ -408,7 +469,19 @@ export default function MindMapCanvas({ nodes, connections, token }) {
 
   function handleNodeSave(updated) {
     setLocalNodes(prev => prev.map(n => n._id === updated._id ? { ...n, ...updated } : n));
-    setEditMode(false);
+  }
+
+  async function refreshConnections() {
+    if (!mindmapId || !token) return;
+    try {
+      const res = await fetch(`/api/connections/${mindmapId}`, { headers: { 'x-auth-token': token } });
+      if (res.ok) setLocalConnections(await res.json());
+    } catch { /* silent */ }
+  }
+
+  function handleNodeCreatedInPanel(newNode) {
+    setLocalNodes(prev => [...prev, newNode]);
+    if (onNodeCreated) onNodeCreated(newNode);
   }
 
   // Build render list from current posMap (re-evaluated on every tick-triggered render)
@@ -527,8 +600,17 @@ export default function MindMapCanvas({ nodes, connections, token }) {
         <EditPanel
           node={activeNode}
           token={token}
+          mindmapId={mindmapId}
+          allNodes={localNodes}
           onSave={handleNodeSave}
           onClose={() => setEditMode(false)}
+          onNodeCreated={handleNodeCreatedInPanel}
+          onNodeClick={(nodeId) => {
+            posMap.current = {};
+            setActiveNodeId(nodeId);
+            setEditMode(false);
+          }}
+          onConnectionsChanged={refreshConnections}
         />
       )}
 

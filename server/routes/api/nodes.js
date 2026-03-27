@@ -6,6 +6,50 @@ const { check, validationResult } = require('express-validator');
 const Node = require('../../src/models/Node');
 const MindMap = require('../../src/models/MindMap');
 
+// @route   GET api/nodes/:mindmap_id/search
+// @desc    Search nodes by title (text field) for @mention autocomplete
+// @access  Private
+// Query params: q (search string, required), limit (default 10, max 10)
+// Returns array of matching nodes (title contains q, case-insensitive)
+// Returns empty array if no matches or if more than 10 match
+// (caller decides whether to show "Create new" prompt)
+router.get('/:mindmap_id/search', auth, async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.trim() === '') {
+      return res.json([]);
+    }
+
+    const mindMap = await MindMap.findById(req.params.mindmap_id);
+    if (!mindMap) return res.status(404).json({ msg: 'Mind map not found' });
+
+    if (mindMap.user_id.toString() !== req.user.id) {
+      return res.status(401).json({ msg: 'User not authorized' });
+    }
+
+    const count = await Node.countDocuments({
+      mindmap_id: req.params.mindmap_id,
+      text: { $regex: q, $options: 'i' }
+    });
+
+    if (count > 10) {
+      return res.json([]);
+    }
+
+    const nodes = await Node.find({
+      mindmap_id: req.params.mindmap_id,
+      text: { $regex: q, $options: 'i' }
+    }).select('_id text thought_type description');
+
+    res.json(nodes);
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === 'ObjectId') return res.status(404).json({ msg: 'Mind map not found' });
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/nodes/:mindmap_id
 // @desc    Get all nodes for a specific mind map
 // @access  Private

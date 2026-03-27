@@ -16,7 +16,7 @@ export default function App() {
           getNodes(token, map._id),
           getConnections(token, map._id),
         ]);
-        setState({ status: 'ready', nodes, connections, mapTitle: map.title, token, error: null });
+        setState({ status: 'ready', nodes, connections, mapTitle: map.title, mindmapId: map._id, token, error: null });
       } catch (err) {
         setState(s => ({ ...s, status: 'error', error: err.message }));
       }
@@ -34,7 +34,13 @@ export default function App() {
         <span style={css.mapName}>{state.mapTitle}</span>
         <span style={css.hint}>Scroll to zoom · Drag to pan</span>
       </header>
-      <MindMapCanvas nodes={state.nodes} connections={state.connections} token={state.token} />
+      <MindMapCanvas
+        nodes={state.nodes}
+        connections={state.connections}
+        token={state.token}
+        mindmapId={state.mindmapId}
+        onNodeCreated={(newNode) => setState(s => ({ ...s, nodes: [...s.nodes, newNode] }))}
+      />
     </div>
   );
 }
