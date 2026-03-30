@@ -33,8 +33,11 @@ app.use(express.json());
 app.use(morgan('combined', { stream: logger.stream }));
 
 // CORS Middleware
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map(o => o.trim())
+  : (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3670']);
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3670',
+  origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -97,18 +100,26 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Serve static assets in production (must be before 404 handler)
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.resolve(__dirname, '..', 'client', 'dist')));
+
+    app.get('/{*path}', (req, res) => {
+        res.sendFile(path.resolve(__dirname, '..', 'client', 'dist', 'index.html'));
+    });
+}
+
 // 404 handler
 app.use((req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
-  error.status = 404;
+  error.statusCode = 404;
   next(error);
 });
 
-// Error handling middleware with enhanced logging
+// Error handling middleware
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
-  
-  // Log the error with stack trace in development
+
   if (statusCode >= 500) {
     logger.error('Server error:', {
       message: err.message,
@@ -121,7 +132,6 @@ app.use((err, req, res, next) => {
       user: req.user ? req.user.id : 'unauthenticated'
     });
   } else {
-    // Log client errors as warnings
     logger.warn('Client error:', {
       status: statusCode,
       message: err.message,
@@ -130,26 +140,20 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // Send error response
+  // Never expose internal details to the client in production
+  const clientMessage = process.env.NODE_ENV === 'production'
+    ? (statusCode === 404 ? 'Not found' : 'An unexpected error occurred')
+    : (err.message || 'An unexpected error occurred');
+
   res.status(statusCode).json({
     success: false,
-    message: err.message || 'An unexpected error occurred',
+    message: clientMessage,
     ...(process.env.NODE_ENV === 'development' && {
       stack: err.stack,
       error: err
     })
   });
 });
-
-// Serve static assets if in production
-if (process.env.NODE_ENV === 'production') {
-    // Set static folder
-    app.use(express.static('client/dist'));
-
-    app.get('/{*path}', (req, res) => {
-        res.sendFile(path.resolve(__dirname, 'client', 'dist', 'index.html'));
-    });
-}
 
 const port = process.env.PORT || 3671;
 
