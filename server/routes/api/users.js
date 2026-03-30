@@ -8,6 +8,8 @@ const logger = require('../../config/logger');
 // const nodemailer = require('nodemailer'); // Uncomment and configure for email sending
 
 const User = require('../../src/models/User');
+const MindMap = require('../../src/models/MindMap');
+const Node = require('../../src/models/Node');
 const auth = require('../../middleware/auth');
 
 // @route   GET api/users
@@ -64,6 +66,24 @@ router.post(
           id: user.id
         }
       };
+
+      // Create default "My Brain" mindmap + root node
+      try {
+        const mindmap = await MindMap.create({
+          title: 'My Brain',
+          user_id: user.id,
+        });
+        await Node.create({
+          mindmap_id: mindmap._id,
+          text: 'My Brain',
+          position: { x: 0, y: 0 },
+          level: 0,
+          thought_type: 'idea',
+        });
+      } catch (seedErr) {
+        logger.error({ message: 'Failed to seed My Brain for new user', error: seedErr });
+        // Non-fatal: user account was created; log and continue
+      }
 
       jwt.sign(
         payload,

@@ -57,6 +57,7 @@ export default function App() {
           </span>
           <span style={css.greeting}>Hello, {auth.user.username}</span>
           <UserPicker currentUser={auth.user} onUserChange={handleUserChange} />
+          <a href="/help" target="_blank" rel="noopener noreferrer" style={css.helpBtn} title="User Manual">?</a>
           <button style={css.logoutBtn} onClick={handleLogout}>Logout</button>
         </div>
       </header>
@@ -113,6 +114,13 @@ const css = {
   savePillSaved: { background: 'rgba(34,197,94,0.15)', color: '#4ade80' },
   savePillSaving: { background: 'rgba(251,191,36,0.15)', color: '#fbbf24' },
   greeting: { fontSize: '13px', color: '#94a3b8', fontFamily: "'Inter','Segoe UI',sans-serif" },
+  helpBtn: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: '22px', height: '22px', borderRadius: '50%',
+    border: '1px solid rgba(255,255,255,0.2)', color: '#94a3b8',
+    fontSize: '13px', fontWeight: 700, textDecoration: 'none',
+    fontFamily: "'Inter','Segoe UI',sans-serif", lineHeight: 1,
+  },
   logoutBtn: {
     background: 'none', border: '1px solid rgba(255,255,255,0.15)',
     borderRadius: '6px', color: '#94a3b8', padding: '4px 10px',
