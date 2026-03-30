@@ -32,3 +32,23 @@ export function updateNode(token, nodeId, fields) {
     body: JSON.stringify(fields),
   });
 }
+
+export function getUsers() {
+  return req('/users/list');
+}
+
+export function selectUser(userId) {
+  return req('/users/select', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export function registerUser(username, email, password) {
+  return req('/users/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, email, password }),
+  });
+}

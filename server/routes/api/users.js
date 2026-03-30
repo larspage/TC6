@@ -209,4 +209,42 @@ router.post('/reset-password/:token', [
   }
 });
 
+// @route   GET api/users/list
+// @desc    Get all users (id, username, email) — profile picker, no auth required
+// @access  Public (temporary until centralized auth)
+router.get('/list', async (req, res) => {
+  try {
+    const users = await User.find({}).select('_id username email').sort({ username: 1 });
+    res.json(users);
+  } catch (err) {
+    logger.error({ message: 'Error listing users', error: err });
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST api/users/select
+// @desc    Issue JWT for a user by ID — no password check (profile picker)
+// @access  Public (temporary until centralized auth)
+router.post('/select', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ errors: [{ msg: 'userId is required' }] });
+
+  try {
+    const user = await User.findById(userId).select('-password');
+    if (!user) return res.status(404).json({ errors: [{ msg: 'User not found' }] });
+
+    const payload = { user: { id: user.id } };
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' }, (err, token) => {
+      if (err) {
+        logger.error({ message: 'JWT Select Error', error: err });
+        return res.status(500).send('Server error on token generation');
+      }
+      res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
+    });
+  } catch (err) {
+    logger.error({ message: 'Select User Error', error: err });
+    res.status(500).send('Server error');
+  }
+});
+
 module.exports = router;

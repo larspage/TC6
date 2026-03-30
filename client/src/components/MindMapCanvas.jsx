@@ -97,7 +97,7 @@ function Tooltip({ node, pos }) {
 }
 
 // ─── Edit panel ───────────────────────────────────────────────────────────────
-function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCreated, onNodeClick, onConnectionsChanged }) {
+function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCreated, onNodeClick, onConnectionsChanged, onSaveStart, onSaveEnd }) {
   const [text, setText]           = useState(node.text);
   const [type, setType]           = useState(node.thought_type || 'idea');
   const [desc, setDesc]           = useState(node.description || '');
@@ -109,6 +109,7 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCr
 
   async function doSave(fields) {
     setSaving(true);
+    onSaveStart?.();
     setError(null);
     try {
       const updated = await updateNode(token, node._id, fields);
@@ -119,6 +120,7 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCr
       setError(e.message);
     } finally {
       setSaving(false);
+      onSaveEnd?.();
     }
   }
 
@@ -240,7 +242,7 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCr
 // ─── Main canvas ──────────────────────────────────────────────────────────────
 const MAX_HOPS = 2;
 
-export default function MindMapCanvas({ nodes, connections, token, mindmapId, onNodeCreated }) {
+export default function MindMapCanvas({ nodes, connections, token, mindmapId, onNodeCreated, onSaveStart, onSaveEnd }) {
   const containerRef              = useRef(null);
   const [size, setSize]           = useState({ w: 0, h: 0 });
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
@@ -611,6 +613,8 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
             setEditMode(false);
           }}
           onConnectionsChanged={refreshConnections}
+          onSaveStart={onSaveStart}
+          onSaveEnd={onSaveEnd}
         />
       )}
 
