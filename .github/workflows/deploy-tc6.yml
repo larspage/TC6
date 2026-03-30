@@ -1,0 +1,62 @@
+name: Deploy TC6 to thoughtcatcher.mrbrooks.biz
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Build client
+        run: npm run build --prefix client
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.TC6_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.TC6_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync client/dist to server
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            client/dist/ \
+            ${{ secrets.TC6_USER }}@${{ secrets.TC6_HOST }}:/var/www/tc6/client/dist/
+
+      - name: Sync server to server
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            server/ \
+            ${{ secrets.TC6_USER }}@${{ secrets.TC6_HOST }}:/var/www/tc6/server/
+
+      - name: Restart app
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TC6_HOST }}
+          username: ${{ secrets.TC6_USER }}
+          key: ${{ secrets.TC6_SSH_KEY }}
+          script: |
+            cd /var/www/tc6
+            npm install --omit=dev --prefix server
+            pm2 restart tc6
+            pm2 save
