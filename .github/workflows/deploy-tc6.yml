@@ -33,6 +33,14 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.TC6_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Ensure target directories exist
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TC6_HOST }}
+          username: ${{ secrets.TC6_USER }}
+          key: ${{ secrets.TC6_SSH_KEY }}
+          script: mkdir -p /var/www/tc6/client/dist /var/www/tc6/server
+
       - name: Sync client/dist to server
         run: |
           rsync -az --delete \
