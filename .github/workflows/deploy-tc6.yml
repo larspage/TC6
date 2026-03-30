@@ -57,6 +57,9 @@ jobs:
             server/ \
             ${{ secrets.TC6_USER }}@${{ secrets.TC6_HOST }}:/var/www/tc6/server/
 
+      - name: Sync root package files to server
+        run: rsync -az -e "ssh -i ~/.ssh/deploy_key" package.json package-lock.json ${{ secrets.TC6_USER }}@${{ secrets.TC6_HOST }}:/var/www/tc6/
+
       - name: Restart app
         uses: appleboy/ssh-action@v1.0.3
         with:
