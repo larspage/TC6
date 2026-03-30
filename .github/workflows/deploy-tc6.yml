@@ -58,7 +58,7 @@ jobs:
             ${{ secrets.TC6_USER }}@${{ secrets.TC6_HOST }}:/var/www/tc6/server/
 
       - name: Sync root package files to server
-        run: rsync -az -e "ssh -i ~/.ssh/deploy_key" package.json package-lock.json ${{ secrets.TC6_USER }}@${{ secrets.TC6_HOST }}:/var/www/tc6/
+        run: rsync -az -e "ssh -i ~/.ssh/deploy_key" package.json package-lock.json ecosystem.config.js ${{ secrets.TC6_USER }}@${{ secrets.TC6_HOST }}:/var/www/tc6/
 
       - name: Restart app
         uses: appleboy/ssh-action@v1.0.3
@@ -68,6 +68,6 @@ jobs:
           key: ${{ secrets.TC6_SSH_KEY }}
           script: |
             cd /var/www/tc6
-            npm install --omit=dev --prefix server
-            pm2 restart tc6
+            npm install --omit=dev
+            pm2 startOrRestart ecosystem.config.js
             pm2 save
