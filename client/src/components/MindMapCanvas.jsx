@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback, useReducer } from 'react';
 import * as d3 from 'd3';
-import { updateNode } from '../api.js';
+import { updateNode, searchNodes } from '../api.js';
 import DescriptionEditor from './DescriptionEditor.jsx';
 import LinksPanel from './LinksPanel.jsx';
 
@@ -97,7 +97,7 @@ function Tooltip({ node, pos }) {
 }
 
 // ─── Edit panel ───────────────────────────────────────────────────────────────
-function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCreated, onNodeClick, onConnectionsChanged, onSaveStart, onSaveEnd }) {
+function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, onNodeClick, onConnectionsChanged, onSaveStart, onSaveEnd }) {
   const [text, setText]           = useState(node.text);
   const [type, setType]           = useState(node.thought_type || 'idea');
   const [desc, setDesc]           = useState(node.description || '');
@@ -158,10 +158,8 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCr
 
   return (
     <div style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,
-      background: '#0F172A', borderLeft: '1px solid #1E293B',
-      boxShadow: '-4px 0 24px rgba(0,0,0,0.5)',
-      display: 'flex', flexDirection: 'column', zIndex: 50,
+      display: 'flex', flexDirection: 'column', height: '100%',
+      background: '#0F172A',
       fontFamily: "'Inter','Segoe UI',sans-serif",
     }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #1E293B', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -169,7 +167,6 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCr
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {savedHint && <span style={{ color: '#68D391', fontSize: 11 }}>Saved</span>}
           {saving    && <span style={{ color: '#64748B', fontSize: 11 }}>Saving…</span>}
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: '0 4px' }}>×</button>
         </div>
       </div>
 
@@ -221,21 +218,17 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCr
             mindmapId={mindmapId}
             token={token}
             allNodes={allNodes}
-            onNodeClick={(nodeId) => { onClose(); onNodeClick(nodeId); }}
+            onNodeClick={onNodeClick}
             onConnectionsChanged={onConnectionsChanged}
           />
         </div>
       </div>
 
-      <div style={{ padding: '14px 20px', borderTop: '1px solid #1E293B', display: 'flex', gap: 10 }}>
+      <div style={{ padding: '14px 20px', borderTop: '1px solid #1E293B' }}>
         <button onClick={() => { clearTimeout(autosaveTimer.current); doSave(buildFields()); }} disabled={saving} style={{
-          flex: 1, background: '#2563EB', color: '#fff', border: 'none',
+          width: '100%', background: '#2563EB', color: '#fff', border: 'none',
           borderRadius: 6, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
         }}>{saving ? 'Saving…' : 'Save'}</button>
-        <button onClick={onClose} style={{
-          background: '#1E293B', color: '#94A3B8', border: '1px solid #334155',
-          borderRadius: 6, padding: '9px 16px', fontSize: 13, cursor: 'pointer',
-        }}>Close</button>
       </div>
     </div>
   );
@@ -252,13 +245,18 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
   const [activeNodeId, setActiveNodeId]       = useState(null);
   const [hoveredNode, setHoveredNode]         = useState(null);
   const [tooltipPos, setTooltipPos]           = useState(null);
-  const [editMode, setEditMode]               = useState(false);
   const [localNodes, setLocalNodes]           = useState(nodes);
   const [localConnections, setLocalConnections] = useState(connections);
+  const [panelWidth, setPanelWidth]           = useState(340);
+  const [searchQuery, setSearchQuery]         = useState('');
+  const [searchResults, setSearchResults]     = useState([]);
+  const [searchLoading, setSearchLoading]     = useState(false);
 
   const simRef       = useRef(null);
   const posMap       = useRef({});
   const drag         = useRef(null);
+  const resizeDrag   = useRef(null);
+  const searchTimer  = useRef(null);
   const initializedK = useRef(false);
   const transformRef = useRef({ x: 0, y: 0, k: 0.72 }); // sync copy for sync reads
   const sizeRef      = useRef({ w: 0, h: 0 });           // sync copy for clamp calc
@@ -440,6 +438,22 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
     };
   }, []);
 
+  // Panel resize drag
+  useEffect(() => {
+    function onMove(e) {
+      if (!resizeDrag.current) return;
+      const delta = resizeDrag.current.startX - e.clientX;
+      setPanelWidth(Math.min(600, Math.max(240, resizeDrag.current.startWidth + delta)));
+    }
+    function onUp() { resizeDrag.current = null; }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
   // Zoom: always pivot on the active node (sim center = size.w/2, size.h/2)
   // so active node stays fixed on screen regardless of current pan offset.
   const onWheel = useCallback((e) => {
@@ -460,15 +474,33 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
 
   function handleNodeClick(e, node) {
     e.stopPropagation();
-    if (node._id === activeNodeId) {
-      setEditMode(true);
-    } else {
+    if (node._id !== activeNodeId) {
       // Clear all positions so the new subgraph seeds from structured angular layout
       posMap.current = {};
       setActiveNodeId(node._id);
-      setEditMode(false);
       setHoveredNode(null);
     }
+  }
+
+  function handleSearch(q) {
+    setSearchQuery(q);
+    clearTimeout(searchTimer.current);
+    if (!q.trim()) { setSearchResults([]); return; }
+    searchTimer.current = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const results = await searchNodes(token, mindmapId, q);
+        setSearchResults(results);
+      } catch { setSearchResults([]); }
+      finally { setSearchLoading(false); }
+    }, 300);
+  }
+
+  function handleSearchResultClick(nodeId) {
+    setSearchQuery('');
+    setSearchResults([]);
+    posMap.current = {};
+    setActiveNodeId(nodeId);
   }
 
   function handleNodeSave(updated) {
@@ -503,131 +535,207 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
 
   const activeNode = localNodes.find(n => n._id === activeNodeId);
 
+  const searchInputStyle = {
+    width: '100%', boxSizing: 'border-box',
+    background: '#1E293B', border: '1px solid #334155', borderRadius: 6,
+    color: '#E2E8F0', fontSize: 13, padding: '8px 10px',
+    fontFamily: "'Inter','Segoe UI',sans-serif", outline: 'none',
+  };
+
   return (
-    <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0F172A' }}>
-      <div
-        ref={containerRef}
-        style={{ width: '100%', height: '100%', cursor: drag.current ? 'grabbing' : 'grab' }}
-        onMouseDown={onMouseDown}
-      >
-        <svg width="100%" height="100%" style={{ display: 'block' }} onWheel={onWheel}>
-          <defs>
-            <filter id="activeglow" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="0" stdDeviation="14" floodColor="#42B4E6" floodOpacity="0.45" />
-            </filter>
-          </defs>
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: '#0F172A' }}>
 
-          <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
+      {/* Canvas area */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <div
+          ref={containerRef}
+          style={{ width: '100%', height: '100%', cursor: drag.current ? 'grabbing' : 'grab' }}
+          onMouseDown={onMouseDown}
+        >
+          <svg width="100%" height="100%" style={{ display: 'block' }} onWheel={onWheel}>
+            <defs>
+              <filter id="activeglow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="0" stdDeviation="14" floodColor="#42B4E6" floodOpacity="0.45" />
+              </filter>
+            </defs>
 
-            {/* Links */}
-            {visibleConns.map(c => {
-              const from = renderPosMap[c.from_node_id];
-              const to   = renderPosMap[c.to_node_id];
-              if (!from || !to) return null;
-              const hopA = hopMap.get(c.from_node_id) ?? 2;
-              const hopB = hopMap.get(c.to_node_id)   ?? 2;
-              const minH = Math.min(hopA, hopB);
-              const stroke  = minH === 0 ? '#42B4E6' : minH === 1 ? '#4A7DB5' : '#334155';
-              const opacity = minH === 0 ? 0.8        : minH === 1 ? 0.5        : 0.3;
-              const sw      = minH === 0 ? 2          : minH === 1 ? 1.5        : 1;
-              return (
-                <line key={c._id}
-                  x1={from.x} y1={from.y} x2={to.x} y2={to.y}
-                  stroke={stroke} strokeWidth={sw} opacity={opacity}
-                />
-              );
-            })}
+            <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
 
-            {/* Nodes */}
-            {renderNodes.map(n => {
-              const s        = hopStyle(n.hop);
-              const isActive = n._id === activeNodeId;
-              const textLines = wrapText(n.text, s.w - 28, s.fs);
-              const tagLine   = isActive && n.tags?.length
-                ? n.tags.slice(0, 4).join(' · ')
-                : null;
-
-              const lineH      = s.fs * 1.35;
-              const tagLineH   = s.fs * 1.1;
-              const totalH     = textLines.length * lineH + (tagLine ? tagLineH : 0);
-              const textStartY = -totalH / 2 + lineH * 0.72;
-
-              return (
-                <g
-                  key={n._id}
-                  transform={`translate(${n.x},${n.y})`}
-                  style={{ cursor: 'pointer' }}
-                  onClick={e => handleNodeClick(e, n)}
-                  onMouseDown={e => e.stopPropagation()}
-                  onMouseEnter={e => {
-                    setHoveredNode(n);
-                    setTooltipPos({ x: e.clientX, y: e.clientY });
-                  }}
-                  onMouseMove={e => setTooltipPos({ x: e.clientX, y: e.clientY })}
-                  onMouseLeave={() => { setHoveredNode(null); setTooltipPos(null); }}
-                >
-                  <rect
-                    x={-s.w / 2} y={-s.h / 2} width={s.w} height={s.h}
-                    rx={8} ry={8}
-                    fill={s.fill} stroke={s.border} strokeWidth={s.bw}
-                    filter={isActive ? 'url(#activeglow)' : undefined}
+              {/* Links */}
+              {visibleConns.map(c => {
+                const from = renderPosMap[c.from_node_id];
+                const to   = renderPosMap[c.to_node_id];
+                if (!from || !to) return null;
+                const hopA = hopMap.get(c.from_node_id) ?? 2;
+                const hopB = hopMap.get(c.to_node_id)   ?? 2;
+                const minH = Math.min(hopA, hopB);
+                const stroke  = minH === 0 ? '#42B4E6' : minH === 1 ? '#4A7DB5' : '#334155';
+                const opacity = minH === 0 ? 0.8        : minH === 1 ? 0.5        : 0.3;
+                const sw      = minH === 0 ? 2          : minH === 1 ? 1.5        : 1;
+                return (
+                  <line key={c._id}
+                    x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                    stroke={stroke} strokeWidth={sw} opacity={opacity}
                   />
-                  {textLines.map((line, i) => (
-                    <text key={i}
-                      x={0} y={textStartY + i * lineH}
-                      textAnchor="middle"
-                      fill={s.text} fontSize={s.fs} fontWeight={s.fw}
-                      fontFamily="'Inter','Segoe UI',sans-serif"
-                      style={{ userSelect: 'none', pointerEvents: 'none' }}
-                    >{line}</text>
-                  ))}
-                  {tagLine && (
-                    <text
-                      x={0} y={textStartY + textLines.length * lineH}
-                      textAnchor="middle"
-                      fill="#90CDF4" fontSize={s.fs * 0.75} fontWeight={400}
-                      fontFamily="'Inter','Segoe UI',sans-serif"
-                      style={{ userSelect: 'none', pointerEvents: 'none' }}
-                    >{tagLine}</text>
-                  )}
-                </g>
-              );
-            })}
+                );
+              })}
 
-          </g>
-        </svg>
+              {/* Nodes */}
+              {renderNodes.map(n => {
+                const s        = hopStyle(n.hop);
+                const isActive = n._id === activeNodeId;
+                const textLines = wrapText(n.text, s.w - 28, s.fs);
+                const tagLine   = isActive && n.tags?.length
+                  ? n.tags.slice(0, 4).join(' · ')
+                  : null;
+
+                const lineH      = s.fs * 1.35;
+                const tagLineH   = s.fs * 1.1;
+                const totalH     = textLines.length * lineH + (tagLine ? tagLineH : 0);
+                const textStartY = -totalH / 2 + lineH * 0.72;
+
+                return (
+                  <g
+                    key={n._id}
+                    transform={`translate(${n.x},${n.y})`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={e => handleNodeClick(e, n)}
+                    onMouseDown={e => e.stopPropagation()}
+                    onMouseEnter={e => {
+                      setHoveredNode(n);
+                      setTooltipPos({ x: e.clientX, y: e.clientY });
+                    }}
+                    onMouseMove={e => setTooltipPos({ x: e.clientX, y: e.clientY })}
+                    onMouseLeave={() => { setHoveredNode(null); setTooltipPos(null); }}
+                  >
+                    <rect
+                      x={-s.w / 2} y={-s.h / 2} width={s.w} height={s.h}
+                      rx={8} ry={8}
+                      fill={s.fill} stroke={s.border} strokeWidth={s.bw}
+                      filter={isActive ? 'url(#activeglow)' : undefined}
+                    />
+                    {textLines.map((line, i) => (
+                      <text key={i}
+                        x={0} y={textStartY + i * lineH}
+                        textAnchor="middle"
+                        fill={s.text} fontSize={s.fs} fontWeight={s.fw}
+                        fontFamily="'Inter','Segoe UI',sans-serif"
+                        style={{ userSelect: 'none', pointerEvents: 'none' }}
+                      >{line}</text>
+                    ))}
+                    {tagLine && (
+                      <text
+                        x={0} y={textStartY + textLines.length * lineH}
+                        textAnchor="middle"
+                        fill="#90CDF4" fontSize={s.fs * 0.75} fontWeight={400}
+                        fontFamily="'Inter','Segoe UI',sans-serif"
+                        style={{ userSelect: 'none', pointerEvents: 'none' }}
+                      >{tagLine}</text>
+                    )}
+                  </g>
+                );
+              })}
+
+            </g>
+          </svg>
+        </div>
+
+        <Tooltip node={hoveredNode} pos={tooltipPos} />
+
+        {/* Hint */}
+        <div style={{
+          position: 'absolute', bottom: 16, left: 16,
+          color: '#334155', fontSize: 11, fontFamily: "'Inter','Segoe UI',sans-serif",
+          userSelect: 'none', pointerEvents: 'none',
+        }}>
+          Click any thought to focus · Scroll to zoom · Drag to pan
+        </div>
       </div>
 
-      <Tooltip node={hoveredNode} pos={tooltipPos} />
+      {/* Resize handle */}
+      <div
+        style={{
+          width: 6, flexShrink: 0, cursor: 'col-resize',
+          background: '#1E293B', borderLeft: '1px solid #0F172A',
+          transition: 'background 0.15s',
+        }}
+        onMouseDown={e => {
+          e.preventDefault();
+          resizeDrag.current = { startX: e.clientX, startWidth: panelWidth };
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#334155'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = '#1E293B'; }}
+      />
 
-      {editMode && activeNode && (
-        <EditPanel
-          node={activeNode}
-          token={token}
-          mindmapId={mindmapId}
-          allNodes={localNodes}
-          onSave={handleNodeSave}
-          onClose={() => setEditMode(false)}
-          onNodeCreated={handleNodeCreatedInPanel}
-          onNodeClick={(nodeId) => {
-            posMap.current = {};
-            setActiveNodeId(nodeId);
-            setEditMode(false);
-          }}
-          onConnectionsChanged={refreshConnections}
-          onSaveStart={onSaveStart}
-          onSaveEnd={onSaveEnd}
-        />
-      )}
-
-      {/* Hint */}
+      {/* Right panel */}
       <div style={{
-        position: 'absolute', bottom: 16, left: 16,
-        color: '#334155', fontSize: 11, fontFamily: "'Inter','Segoe UI',sans-serif",
-        userSelect: 'none', pointerEvents: 'none',
+        width: panelWidth, flexShrink: 0, display: 'flex', flexDirection: 'column',
+        background: '#0F172A', borderLeft: '1px solid #1E293B', overflow: 'hidden',
       }}>
-        Click any thought to focus · Click active thought to edit · Scroll to zoom · Drag to pan
+        {/* Search bar */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #1E293B' }}>
+          <input
+            value={searchQuery}
+            onChange={e => handleSearch(e.target.value)}
+            placeholder="Search thoughts…"
+            style={searchInputStyle}
+          />
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {searchQuery ? (
+            <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+              {searchLoading && (
+                <div style={{ padding: '16px 20px', color: '#64748B', fontSize: 13, fontFamily: "'Inter','Segoe UI',sans-serif" }}>Searching…</div>
+              )}
+              {!searchLoading && searchResults.length === 0 && (
+                <div style={{ padding: '16px 20px', color: '#475569', fontSize: 13, fontFamily: "'Inter','Segoe UI',sans-serif", fontStyle: 'italic' }}>No results</div>
+              )}
+              {searchResults.map(r => (
+                <div
+                  key={r._id}
+                  onClick={() => handleSearchResultClick(r._id)}
+                  style={{
+                    padding: '10px 20px', cursor: 'pointer', borderBottom: '1px solid #1E293B',
+                    fontFamily: "'Inter','Segoe UI',sans-serif",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#1E293B'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div style={{ fontWeight: r.matchedInTitle ? 600 : 400, fontSize: 13, color: r.matchedInTitle ? '#E2E8F0' : '#94A3B8' }}>{r.text}</div>
+                  {r.description && (
+                    <div style={{ fontSize: 11, color: '#475569', marginTop: 3, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                      {r.description}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : activeNode ? (
+            <EditPanel
+              node={activeNode}
+              token={token}
+              mindmapId={mindmapId}
+              allNodes={localNodes}
+              onSave={handleNodeSave}
+              onNodeCreated={handleNodeCreatedInPanel}
+              onNodeClick={(nodeId) => {
+                posMap.current = {};
+                setActiveNodeId(nodeId);
+              }}
+              onConnectionsChanged={refreshConnections}
+              onSaveStart={onSaveStart}
+              onSaveEnd={onSaveEnd}
+            />
+          ) : (
+            <div style={{ padding: '20px', color: '#475569', fontSize: 13, fontFamily: "'Inter','Segoe UI',sans-serif", fontStyle: 'italic' }}>
+              Select a thought to edit it
+            </div>
+          )}
+        </div>
       </div>
+
     </div>
   );
 }

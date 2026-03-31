@@ -20,14 +20,19 @@
 
 ```
 App
-└── MindMapCanvas          (SVG canvas + all overlays)
-    ├── Tooltip             (hover card over canvas nodes)
-    ├── EditPanel           (right-side drawer, opens on active-node click)
-    │   ├── DescriptionEditor  (textarea with @mention autocomplete)
-    │   │   └── MentionAutocomplete  (dropdown for @ trigger)
-    │   └── LinksPanel         (inbound backlinks + outbound manual links)
-    │       └── NodePreviewCard  (hover popup over link chips)
-    └── [hint overlay]
+└── MindMapCanvas          (flex row: canvas + resize handle + right panel)
+    ├── [canvas area]
+    │   ├── SVG             (D3 force graph, pan/zoom)
+    │   ├── Tooltip         (hover card, position: absolute)
+    │   └── [hint overlay]  (position: absolute, bottom-left)
+    ├── [resize handle]     (6px, col-resize cursor, drag updates panelWidth)
+    └── [right panel]       (always visible, width: panelWidth, default 340px)
+        ├── [search bar]    (top; shows SearchResults list when active)
+        └── EditPanel       (shows for active node when search is empty)
+            ├── DescriptionEditor  (textarea with @mention autocomplete)
+            │   └── MentionAutocomplete  (dropdown for @ trigger)
+            └── LinksPanel         (inbound backlinks + outbound manual links)
+                └── NodePreviewCard  (hover popup over link chips)
 ```
 
 ## App.jsx

@@ -52,3 +52,10 @@ export function registerUser(username, email, password) {
     body: JSON.stringify({ username, email, password }),
   });
 }
+
+export function searchNodes(token, mindmapId, query) {
+  const encoded = encodeURIComponent(query);
+  return req(`/nodes/${mindmapId}/fullsearch?q=${encoded}`, {
+    headers: { 'x-auth-token': token },
+  });
+}

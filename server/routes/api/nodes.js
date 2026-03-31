@@ -6,6 +6,46 @@ const { check, validationResult } = require('express-validator');
 const Node = require('../../src/models/Node');
 const MindMap = require('../../src/models/MindMap');
 
+// @route   GET api/nodes/:mindmap_id/fullsearch
+// @desc    Full-text search across title and description (MongoDB text index, stemmed)
+// @access  Private
+// Query params: q (search string)
+// Returns nodes sorted by relevance (title hits ranked higher via index weights)
+// Each result annotated with matchedInTitle boolean
+router.get('/:mindmap_id/fullsearch', auth, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || !q.trim()) return res.json([]);
+
+    const mindMap = await MindMap.findById(req.params.mindmap_id);
+    if (!mindMap) return res.status(404).json({ msg: 'Mind map not found' });
+    if (mindMap.user_id.toString() !== req.user.id) {
+      return res.status(401).json({ msg: 'User not authorized' });
+    }
+
+    const results = await Node.find(
+      { mindmap_id: req.params.mindmap_id, $text: { $search: q } },
+      { score: { $meta: 'textScore' } }
+    ).sort({ score: { $meta: 'textScore' } }).limit(30);
+
+    const qLower = q.toLowerCase();
+    const annotated = results.map(n => ({
+      _id: n._id,
+      text: n.text,
+      description: n.description,
+      thought_type: n.thought_type,
+      matchedInTitle: n.text.toLowerCase().includes(qLower),
+      score: n.get('score'),
+    }));
+
+    res.json(annotated);
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === 'ObjectId') return res.status(404).json({ msg: 'Mind map not found' });
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET api/nodes/:mindmap_id/search
 // @desc    Search nodes by title (text field) for @mention autocomplete
 // @access  Private

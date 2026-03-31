@@ -65,5 +65,9 @@ const NodeSchema = new Schema({
 
 NodeSchema.index({ mindmap_id: 1 });
 NodeSchema.index({ mindmap_id: 1, parent_id: 1 });
+NodeSchema.index(
+  { text: 'text', description: 'text' },
+  { weights: { text: 10, description: 1 }, default_language: 'english' }
+);
 
 module.exports = mongoose.model('Node', NodeSchema);

@@ -172,6 +172,23 @@ JWT tokens are issued on register and login. Tokens expire after 1 hour.
 
 ## Nodes
 
+### GET /api/nodes/:mindmap_id/fullsearch
+**Description:** Full-text search across node `text` (title) and `description` fields using MongoDB text index with Porter stemmer. Title hits ranked higher (index weight 10 vs 1). Returns up to 30 results sorted by relevance score.
+**Auth:** Required
+**Params / Body:**
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| mindmap_id | ObjectId | URL param | Mind map to search within |
+| q | String | Query param | Search string; returns `[]` if empty |
+
+**Response:** `[{ _id, text, description, thought_type, matchedInTitle: boolean, score: number }]`
+**Errors:**
+- `401` — `{ msg: 'User not authorized' }`
+- `404` — `{ msg: 'Mind map not found' }`
+- `500` — Server Error
+
+---
+
 ### GET /api/nodes/:mindmap_id/search
 **Description:** Search nodes by title (`text` field) within a mind map. Intended for `@mention` autocomplete. Returns at most 10 results. If more than 10 nodes match, returns an empty array so the caller can show a "Create new" prompt instead.
 **Auth:** Required
