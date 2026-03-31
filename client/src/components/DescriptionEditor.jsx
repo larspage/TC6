@@ -12,7 +12,7 @@ const inputStyle = {
   outline: 'none',
 };
 
-export default function DescriptionEditor({ value, onChange, nodes, token, mindmapId, onNodeCreated }) {
+export default function DescriptionEditor({ value, onChange, nodes, token, mindmapId, nodeId, onNodeCreated, onConnectionsChanged }) {
   const [mentionQuery, setMentionQuery] = useState(null);
   const [mentionPos, setMentionPos] = useState(null);
   const [mentionStart, setMentionStart] = useState(null);
@@ -83,32 +83,45 @@ export default function DescriptionEditor({ value, onChange, nodes, token, mindm
   };
 
   const handleCreate = async (query) => {
+    const capturedMentionStart = mentionStart;
     setMentionQuery(null);
     setMentionPos(null);
     setMentionStart(null);
     try {
-      const res = await fetch('/api/nodes', {
+      const headers = { 'Content-Type': 'application/json', 'x-auth-token': token };
+
+      // Step 1: create the new node
+      const nodeRes = await fetch('/api/nodes', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': token,
-        },
-        body: JSON.stringify({
-          mindmap_id: mindmapId,
-          text: query,
-          position: { x: 0, y: 0 },
-        }),
+        headers,
+        body: JSON.stringify({ mindmap_id: mindmapId, text: query, position: { x: 0, y: 0 } }),
       });
-      if (!res.ok) return;
-      const newNode = await res.json();
+      if (!nodeRes.ok) return;
+      const newNode = await nodeRes.json();
+
+      // Step 2: create the mention connection from current node to new node
+      if (nodeId) {
+        await fetch('/api/connections', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            mindmap_id: mindmapId,
+            from_node_id: nodeId,
+            to_node_id: newNode._id,
+            connection_type: 'mention',
+          }),
+        });
+        onConnectionsChanged?.();
+      }
+
+      // Step 3: insert [[NodeTitle]] into the description
       const textarea = textareaRef.current;
       const cursor = textarea ? textarea.selectionStart : value.length;
-      const before = value.slice(0, mentionStart ?? cursor);
+      const before = value.slice(0, capturedMentionStart ?? cursor);
       const after = value.slice(cursor);
       const inserted = `[[${newNode.text}]]`;
-      const newValue = before + inserted + after;
-      onChange(newValue);
-      if (onNodeCreated) onNodeCreated(newNode);
+      onChange(before + inserted + after);
+      onNodeCreated?.(newNode);
     } catch {
       // silent fail
     }

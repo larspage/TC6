@@ -199,7 +199,9 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onClose, onNodeCr
           nodes={allNodes}
           token={token}
           mindmapId={mindmapId}
+          nodeId={node._id}
           onNodeCreated={onNodeCreated}
+          onConnectionsChanged={onConnectionsChanged}
         />
 
         <label style={label}>Tags (comma-separated)</label>
