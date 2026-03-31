@@ -27,10 +27,11 @@ export default function DescriptionEditor({ value, onChange, nodes, token, mindm
   const detectMention = (text, textarea) => {
     const cursor = textarea.selectionStart;
 
-    // Scan backwards from cursor to find last @ (stop at newline, space, or start)
+    // Scan backwards from cursor to find last @ (stop at newline or start)
+    // Spaces are allowed in mention queries (e.g. @My Friends)
     let atIndex = -1;
     for (let i = cursor - 1; i >= 0; i--) {
-      if (text[i] === '\n' || text[i] === ' ') break;
+      if (text[i] === '\n') break;
       if (text[i] === '@') {
         atIndex = i;
         break;

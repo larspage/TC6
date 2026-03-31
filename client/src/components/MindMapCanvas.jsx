@@ -104,6 +104,7 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
   const [tags, setTags]           = useState((node.tags || []).join(', '));
   const [saving, setSaving]       = useState(false);
   const [savedHint, setSavedHint] = useState(false);
+  const [isDirty, setIsDirty]     = useState(false);
   const [error, setError]         = useState(null);
   const autosaveTimer             = useRef(null);
 
@@ -114,6 +115,7 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
     try {
       const updated = await updateNode(token, node._id, fields);
       onSave(updated);
+      setIsDirty(false);
       setSavedHint(true);
       setTimeout(() => setSavedHint(false), 1500);
     } catch (e) {
@@ -134,6 +136,7 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
   }
 
   function scheduleAutosave(overrides = {}) {
+    setIsDirty(true);
     clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => doSave(buildFields(overrides)), 2000);
   }
@@ -225,9 +228,10 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
       </div>
 
       <div style={{ padding: '14px 20px', borderTop: '1px solid #1E293B' }}>
-        <button onClick={() => { clearTimeout(autosaveTimer.current); doSave(buildFields()); }} disabled={saving} style={{
-          width: '100%', background: '#2563EB', color: '#fff', border: 'none',
-          borderRadius: 6, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+        <button onClick={() => { clearTimeout(autosaveTimer.current); doSave(buildFields()); }} disabled={saving || !isDirty} style={{
+          width: '100%', background: isDirty ? '#2563EB' : '#1E293B', color: isDirty ? '#fff' : '#475569', border: 'none',
+          borderRadius: 6, padding: '9px', fontSize: 13, fontWeight: 600, cursor: isDirty ? 'pointer' : 'default',
+          transition: 'background 0.15s, color 0.15s',
         }}>{saving ? 'Saving…' : 'Save'}</button>
       </div>
     </div>
@@ -714,6 +718,7 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
             </div>
           ) : activeNode ? (
             <EditPanel
+              key={activeNode._id}
               node={activeNode}
               token={token}
               mindmapId={mindmapId}

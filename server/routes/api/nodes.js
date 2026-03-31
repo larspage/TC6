@@ -211,6 +211,23 @@ router.put(
         return res.status(401).json({ msg: 'User not authorized' });
       }
 
+      // If title changed, update [[OldTitle]] → [[NewTitle]] in all descriptions in this mindmap
+      const oldTitle = node.text;
+      const newTitle = nodeFields.text;
+      if (newTitle && newTitle !== oldTitle) {
+        const oldRef = `[[${oldTitle}]]`;
+        const newRef = `[[${newTitle}]]`;
+        const affectedNodes = await Node.find({
+          mindmap_id: node.mindmap_id,
+          description: { $regex: oldRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') },
+        });
+        for (const n of affectedNodes) {
+          await Node.findByIdAndUpdate(n._id, {
+            $set: { description: n.description.split(oldRef).join(newRef) },
+          });
+        }
+      }
+
       node = await Node.findByIdAndUpdate(
         req.params.id,
         { $set: nodeFields },
