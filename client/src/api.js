@@ -53,9 +53,17 @@ export function registerUser(username, email, password) {
   });
 }
 
-export function searchNodes(token, mindmapId, query) {
-  const encoded = encodeURIComponent(query);
-  return req(`/nodes/${mindmapId}/fullsearch?q=${encoded}`, {
+export function searchNodes(token, mindmapId, query, options = {}) {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  if (options.mode && options.mode !== 'regex') params.set('mode', options.mode);
+  if (options.type) params.set('type', options.type);
+  if (options.fields) {
+    for (const [key, value] of Object.entries(options.fields)) {
+      if (value) params.set(`td_${key}`, value);
+    }
+  }
+  return req(`/nodes/${mindmapId}/fullsearch?${params}`, {
     headers: { 'x-auth-token': token },
   });
 }

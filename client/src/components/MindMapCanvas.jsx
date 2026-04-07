@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { updateNode, searchNodes } from '../api.js';
 import DescriptionEditor from './DescriptionEditor.jsx';
 import LinksPanel from './LinksPanel.jsx';
+import { resolveFields, TYPE_DEFINITIONS, groupedTypes } from './type_definitions.js';
 
 // ─── Node dimensions by hop distance from active thought ─────────────────────
 const HOP_STYLE = {
@@ -64,7 +65,9 @@ function wrapText(text, maxW, fs) {
 // ─── Hover tooltip (HTML overlay) ────────────────────────────────────────────
 function Tooltip({ node, pos }) {
   if (!node || !pos) return null;
-  const typeColors = { idea: '#90CDF4', task: '#F6AD55', note: '#68D391', question: '#FC8181' };
+  const typeDef = TYPE_DEFINITIONS[node.thought_type];
+  const typeColor = typeDef?.color || '#90CDF4';
+  const typeLabel = typeDef?.label || node.thought_type;
   return (
     <div style={{
       position: 'absolute', left: pos.x + 16, top: pos.y - 12, zIndex: 100,
@@ -75,8 +78,8 @@ function Tooltip({ node, pos }) {
     }}>
       <div style={{ fontWeight: 700, fontSize: 13, color: '#fff', marginBottom: 5 }}>{node.text}</div>
       {node.thought_type && (
-        <div style={{ color: typeColors[node.thought_type] || '#90CDF4', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          {node.thought_type}
+        <div style={{ color: typeColor, fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {typeLabel}
         </div>
       )}
       {node.description && (
@@ -96,12 +99,75 @@ function Tooltip({ node, pos }) {
   );
 }
 
+// ─── Dynamic type field renderer ─────────────────────────────────────────────
+function TypeFieldInput({ field, value, onChange, inputStyle }) {
+  switch (field.inputType) {
+    case 'textarea':
+      return (
+        <textarea
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          rows={3}
+          style={{ ...inputStyle, resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
+        />
+      );
+    case 'select':
+      return (
+        <select value={value || ''} onChange={e => onChange(e.target.value)} style={inputStyle}>
+          {(field.options || []).map(o => (
+            <option key={o} value={o}>{o || '—'}</option>
+          ))}
+        </select>
+      );
+    case 'checkbox':
+      return (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', paddingTop: 4 }}>
+          <input
+            type="checkbox"
+            checked={!!value}
+            onChange={e => onChange(e.target.checked)}
+            style={{ width: 15, height: 15, accentColor: '#42B4E6', cursor: 'pointer' }}
+          />
+          <span style={{ color: '#94A3B8', fontSize: 12 }}>{value ? 'Yes' : 'No'}</span>
+        </label>
+      );
+    case 'rating':
+      return (
+        <div style={{ display: 'flex', gap: 3, paddingTop: 4 }}>
+          {[1, 2, 3, 4, 5].map(n => (
+            <span
+              key={n}
+              onClick={() => onChange(value === n ? 0 : n)}
+              style={{ cursor: 'pointer', fontSize: 20, lineHeight: 1, color: n <= (value || 0) ? '#F6AD55' : '#334155', userSelect: 'none' }}
+            >★</span>
+          ))}
+        </div>
+      );
+    case 'number':
+      return (
+        <input
+          type="number"
+          value={value || ''}
+          onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+          style={inputStyle}
+        />
+      );
+    case 'url':
+      return <input type="url" value={value || ''} onChange={e => onChange(e.target.value)} style={inputStyle} />;
+    case 'email':
+      return <input type="email" value={value || ''} onChange={e => onChange(e.target.value)} style={inputStyle} />;
+    default:
+      return <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} style={inputStyle} />;
+  }
+}
+
 // ─── Edit panel ───────────────────────────────────────────────────────────────
 function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, onNodeClick, onConnectionsChanged, onSaveStart, onSaveEnd }) {
   const [text, setText]           = useState(node.text);
   const [type, setType]           = useState(node.thought_type || 'idea');
   const [desc, setDesc]           = useState(node.description || '');
   const [tags, setTags]           = useState((node.tags || []).join(', '));
+  const [typeData, setTypeData]   = useState(node.type_data || {});
   const [saving, setSaving]       = useState(false);
   const [savedHint, setSavedHint] = useState(false);
   const [isDirty, setIsDirty]     = useState(false);
@@ -128,10 +194,11 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
 
   function buildFields(overrides = {}) {
     return {
-      text: (overrides.text ?? text).trim(),
+      text:         (overrides.text ?? text).trim(),
       thought_type: overrides.type ?? type,
-      description: (overrides.desc ?? desc).trim(),
-      tags: (overrides.tags ?? tags).split(',').map(t => t.trim()).filter(Boolean),
+      description:  (overrides.desc ?? desc).trim(),
+      tags:         (overrides.tags ?? tags).split(',').map(t => t.trim()).filter(Boolean),
+      type_data:    overrides.typeData ?? typeData,
     };
   }
 
@@ -144,6 +211,12 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
   function handleBlurSave() {
     clearTimeout(autosaveTimer.current);
     doSave(buildFields());
+  }
+
+  function handleTypeDataChange(key, value) {
+    const newData = { ...typeData, [key]: value };
+    setTypeData(newData);
+    scheduleAutosave({ typeData: newData });
   }
 
   useEffect(() => () => clearTimeout(autosaveTimer.current), []);
@@ -159,6 +232,11 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
     marginBottom: 5, marginTop: 14, textTransform: 'uppercase', letterSpacing: '0.06em',
   };
 
+  const typeFields = resolveFields(type);
+  const groups = groupedTypes();
+  const typeDef = TYPE_DEFINITIONS[type];
+  const typeColor = typeDef?.color || '#90CDF4';
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
@@ -166,7 +244,10 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
       fontFamily: "'Inter','Segoe UI',sans-serif",
     }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #1E293B', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ color: '#42B4E6', fontWeight: 700, fontSize: 14 }}>Edit Thought</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: typeColor, flexShrink: 0, display: 'inline-block' }} />
+          <span style={{ color: '#42B4E6', fontWeight: 700, fontSize: 14 }}>{typeDef?.label || 'Edit Thought'}</span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {savedHint && <span style={{ color: '#68D391', fontSize: 11 }}>Saved</span>}
           {saving    && <span style={{ color: '#64748B', fontSize: 11 }}>Saving…</span>}
@@ -186,13 +267,33 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
         <select
           value={type}
           onChange={e => { setType(e.target.value); scheduleAutosave({ type: e.target.value }); }}
-          onBlur={handleBlurSave}
           style={input}
         >
-          {['idea', 'task', 'note', 'question'].map(t => <option key={t} value={t}>{t}</option>)}
+          {Object.entries(groups).map(([groupName, types]) => (
+            <optgroup key={groupName} label={groupName}>
+              {types.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+            </optgroup>
+          ))}
         </select>
 
-        <label style={label}>Description</label>
+        {/* Dynamic type-specific fields */}
+        {typeFields.length > 0 && (
+          <div style={{ marginTop: 4 }}>
+            {typeFields.map(field => (
+              <div key={field.key}>
+                <label style={label}>{field.label}</label>
+                <TypeFieldInput
+                  field={field}
+                  value={typeData[field.key]}
+                  onChange={v => handleTypeDataChange(field.key, v)}
+                  inputStyle={input}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <label style={{ ...label, marginTop: 18 }}>Description</label>
         <DescriptionEditor
           value={desc}
           onChange={v => { setDesc(v); scheduleAutosave({ desc: v }); }}
@@ -255,6 +356,10 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
   const [searchQuery, setSearchQuery]         = useState('');
   const [searchResults, setSearchResults]     = useState([]);
   const [searchLoading, setSearchLoading]     = useState(false);
+  const [advancedOpen, setAdvancedOpen]       = useState(false);
+  const [searchMode, setSearchMode]           = useState('regex');
+  const [searchType, setSearchType]           = useState('');
+  const [searchFields, setSearchFields]       = useState({});
 
   const simRef       = useRef(null);
   const posMap       = useRef({});
@@ -486,18 +591,40 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
     }
   }
 
-  function handleSearch(q) {
-    setSearchQuery(q);
+  function triggerSearch(q, mode, type, fields) {
     clearTimeout(searchTimer.current);
-    if (!q.trim()) { setSearchResults([]); return; }
+    const hasFilters = type || Object.values(fields).some(v => v);
+    if (!q.trim() && !hasFilters) { setSearchResults([]); setSearchLoading(false); return; }
+    setSearchLoading(true);
     searchTimer.current = setTimeout(async () => {
-      setSearchLoading(true);
       try {
-        const results = await searchNodes(token, mindmapId, q);
+        const results = await searchNodes(token, mindmapId, q, { mode, type, fields });
         setSearchResults(results);
       } catch { setSearchResults([]); }
       finally { setSearchLoading(false); }
     }, 300);
+  }
+
+  function handleSearch(q) {
+    setSearchQuery(q);
+    triggerSearch(q, searchMode, searchType, searchFields);
+  }
+
+  function handleAdvancedModeChange(mode) {
+    setSearchMode(mode);
+    triggerSearch(searchQuery, mode, searchType, searchFields);
+  }
+
+  function handleAdvancedTypeChange(type) {
+    setSearchType(type);
+    setSearchFields({});
+    triggerSearch(searchQuery, searchMode, type, {});
+  }
+
+  function handleSearchFieldChange(key, value) {
+    const newFields = { ...searchFields, [key]: value };
+    setSearchFields(newFields);
+    triggerSearch(searchQuery, searchMode, searchType, newFields);
   }
 
   function handleSearchResultClick(nodeId) {
@@ -676,19 +803,91 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
         width: panelWidth, flexShrink: 0, display: 'flex', flexDirection: 'column',
         background: '#0F172A', borderLeft: '1px solid #1E293B', overflow: 'hidden',
       }}>
-        {/* Search bar */}
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #1E293B' }}>
-          <input
-            value={searchQuery}
-            onChange={e => handleSearch(e.target.value)}
-            placeholder="Search thoughts…"
-            style={searchInputStyle}
-          />
+        {/* Search bar + advanced panel */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #1E293B', fontFamily: "'Inter','Segoe UI',sans-serif" }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={searchQuery}
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="Search thoughts…"
+              style={{ ...searchInputStyle, flex: 1 }}
+            />
+            <button
+              onClick={() => setAdvancedOpen(o => !o)}
+              title="Advanced search"
+              style={{
+                flexShrink: 0, padding: '6px 10px', fontSize: 14,
+                background: advancedOpen ? '#2563EB' : '#1E293B',
+                color: advancedOpen ? '#fff' : '#64748B',
+                border: '1px solid #334155', borderRadius: 6, cursor: 'pointer',
+              }}
+            >⚙</button>
+          </div>
+
+          {advancedOpen && (
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Mode toggle */}
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['regex', 'Partial match'], ['text', 'Stemmed (Porter)']].map(([m, label]) => (
+                  <button key={m} onClick={() => handleAdvancedModeChange(m)} style={{
+                    flex: 1, padding: '5px 4px', fontSize: 11, borderRadius: 4,
+                    cursor: 'pointer', border: '1px solid #334155',
+                    background: searchMode === m ? '#2563EB' : '#1E293B',
+                    color: searchMode === m ? '#fff' : '#94A3B8',
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {/* Type filter */}
+              <select
+                value={searchType}
+                onChange={e => handleAdvancedTypeChange(e.target.value)}
+                style={{ ...searchInputStyle, fontSize: 12 }}
+              >
+                <option value="">Any type</option>
+                {Object.entries(groupedTypes()).map(([group, types]) => (
+                  <optgroup key={group} label={group}>
+                    {types.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+
+              {/* Dynamic field filters — select and date fields only */}
+              {searchType && resolveFields(searchType)
+                .filter(f => f.inputType === 'select' || f.inputType === 'date')
+                .map(field => (
+                  <div key={field.key}>
+                    {field.inputType === 'date' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ color: '#64748B', fontSize: 11, minWidth: 56, flexShrink: 0 }}>{field.label}</span>
+                        <input type="date" value={searchFields[`${field.key}_from`] || ''}
+                          onChange={e => handleSearchFieldChange(`${field.key}_from`, e.target.value)}
+                          style={{ ...searchInputStyle, flex: 1, fontSize: 11, padding: '5px 6px' }} />
+                        <span style={{ color: '#475569', fontSize: 11 }}>–</span>
+                        <input type="date" value={searchFields[`${field.key}_to`] || ''}
+                          onChange={e => handleSearchFieldChange(`${field.key}_to`, e.target.value)}
+                          style={{ ...searchInputStyle, flex: 1, fontSize: 11, padding: '5px 6px' }} />
+                      </div>
+                    ) : (
+                      <select value={searchFields[field.key] || ''}
+                        onChange={e => handleSearchFieldChange(field.key, e.target.value)}
+                        style={{ ...searchInputStyle, fontSize: 12 }}>
+                        <option value="">Any {field.label.toLowerCase()}</option>
+                        {(field.options || []).filter(o => o).map(o => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                ))
+              }
+            </div>
+          )}
         </div>
 
         {/* Content */}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          {searchQuery ? (
+          {(searchQuery || (advancedOpen && (searchType || Object.values(searchFields).some(v => v)))) ? (
             <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
               {searchLoading && (
                 <div style={{ padding: '16px 20px', color: '#64748B', fontSize: 13, fontFamily: "'Inter','Segoe UI',sans-serif" }}>Searching…</div>
@@ -707,9 +906,15 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
                   onMouseEnter={e => { e.currentTarget.style.background = '#1E293B'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <div style={{ fontWeight: r.matchedInTitle ? 600 : 400, fontSize: 13, color: r.matchedInTitle ? '#E2E8F0' : '#94A3B8' }}>{r.text}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <span style={{
+                      width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                      background: TYPE_DEFINITIONS[r.thought_type]?.color || '#90CDF4',
+                    }} />
+                    <div style={{ fontWeight: r.matchedInTitle ? 600 : 400, fontSize: 13, color: r.matchedInTitle ? '#E2E8F0' : '#94A3B8' }}>{r.text}</div>
+                  </div>
                   {r.description && (
-                    <div style={{ fontSize: 11, color: '#475569', marginTop: 3, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: 11, color: '#475569', marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', paddingLeft: 13 }}>
                       {r.description}
                     </div>
                   )}

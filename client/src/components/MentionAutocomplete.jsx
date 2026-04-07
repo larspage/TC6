@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const typeColors = { idea: '#90CDF4', task: '#F6AD55', note: '#68D391', question: '#FC8181' };
+import { TYPE_DEFINITIONS } from './type_definitions.js';
 
 export default function MentionAutocomplete({ query, nodes, position, onSelect, onCreate, onDismiss }) {
   const [highlighted, setHighlighted] = useState(0);
@@ -89,7 +88,7 @@ export default function MentionAutocomplete({ query, nodes, position, onSelect, 
             </div>
           );
         }
-        const typeColor = typeColors[item.node.thought_type] || '#90CDF4';
+        const typeColor = TYPE_DEFINITIONS[item.node.thought_type]?.color || '#90CDF4';
         return (
           <div
             key={item.node._id}

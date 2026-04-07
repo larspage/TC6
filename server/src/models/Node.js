@@ -48,8 +48,11 @@ const NodeSchema = new Schema({
   },
   thought_type: {
     type: String,
-    enum: ['idea', 'task', 'note', 'question'],
-    default: 'idea'
+    default: 'idea',
+  },
+  type_data: {
+    type: Schema.Types.Mixed,
+    default: {},
   },
   description: {
     type: String,

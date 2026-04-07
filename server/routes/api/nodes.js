@@ -23,20 +23,64 @@ router.get('/:mindmap_id/fullsearch', auth, async (req, res) => {
       return res.status(401).json({ msg: 'User not authorized' });
     }
 
-    const results = await Node.find(
-      { mindmap_id: req.params.mindmap_id, $text: { $search: q } },
-      { score: { $meta: 'textScore' } }
-    ).sort({ score: { $meta: 'textScore' } }).limit(30);
+    const { mode, type, ...rest } = req.query;
+    const query = { mindmap_id: req.params.mindmap_id };
 
-    const qLower = q.toLowerCase();
-    const annotated = results.map(n => ({
-      _id: n._id,
-      text: n.text,
-      description: n.description,
-      thought_type: n.thought_type,
-      matchedInTitle: n.text.toLowerCase().includes(qLower),
-      score: n.get('score'),
-    }));
+    // Text search — regex (partial) or $text (stemmed Porter)
+    let regex = null;
+    if (q && q.trim()) {
+      if (mode === 'text') {
+        query.$text = { $search: q };
+      } else {
+        const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regex = new RegExp(escaped, 'i');
+        query.$or = [{ text: regex }, { description: regex }];
+      }
+    }
+
+    // Thought type filter
+    if (type) query.thought_type = type;
+
+    // type_data field filters: td_<key>, td_<key>_from, td_<key>_to
+    for (const [param, value] of Object.entries(rest)) {
+      if (!param.startsWith('td_') || !value) continue;
+      const field = param.slice(3);
+      if (field.endsWith('_from')) {
+        const key = `type_data.${field.slice(0, -5)}`;
+        query[key] = { ...(query[key] || {}), $gte: value };
+      } else if (field.endsWith('_to')) {
+        const key = `type_data.${field.slice(0, -3)}`;
+        query[key] = { ...(query[key] || {}), $lte: value };
+      } else {
+        query[`type_data.${field}`] = value;
+      }
+    }
+
+    // Execute — use textScore projection only when $text is in play
+    let results;
+    if (query.$text) {
+      results = await Node.find(query, { score: { $meta: 'textScore' } })
+        .sort({ score: { $meta: 'textScore' } })
+        .limit(50);
+    } else {
+      results = await Node.find(query).limit(50);
+    }
+
+    // Annotate matchedInTitle and sort title hits first
+    const annotated = results
+      .map(n => ({
+        _id: n._id,
+        text: n.text,
+        description: n.description,
+        thought_type: n.thought_type,
+        type_data: n.type_data,
+        matchedInTitle: regex ? regex.test(n.text) : (q ? n.text.toLowerCase().includes(q.toLowerCase()) : true),
+      }))
+      .sort((a, b) => {
+        if (a.matchedInTitle && !b.matchedInTitle) return -1;
+        if (!a.matchedInTitle && b.matchedInTitle) return 1;
+        return 0;
+      });
 
     res.json(annotated);
   } catch (err) {
@@ -187,7 +231,7 @@ router.put(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { text, position, styling, description, tags, thought_type } = req.body;
+    const { text, position, styling, description, tags, thought_type, type_data } = req.body;
 
     // Build node object
     const nodeFields = {};
@@ -197,6 +241,7 @@ router.put(
     if (description !== undefined) nodeFields.description = description;
     if (tags !== undefined) nodeFields.tags = tags;
     if (thought_type) nodeFields.thought_type = thought_type;
+    if (type_data !== undefined) nodeFields.type_data = type_data;
     nodeFields.updated_at = Date.now();
 
     try {

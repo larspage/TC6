@@ -9,9 +9,9 @@
     "start": "node server/index.js",
     "test": "cross-env NODE_ENV=test jest --runInBand",
     "dev:server": "cross-env PORT=3671 node server/index.js",
-    "dev:client": "npm start --prefix client",
+    "dev:client": "npm run dev --prefix client",
     "kill-ports": "node scripts/kill-ports.js",
-    "dev": "npm run kill-ports && cross-env PORT=3671 echo Backend Health Check: http://localhost:3671/health && concurrently \"npm run dev:server\" \"npm run dev:client\""
+    "dev": "npm run kill-ports && concurrently --names \"server,client\" --prefix-colors \"cyan,magenta\" \"npm run dev:server\" \"npm run dev:client\""
   },
   "keywords": [],
   "author": "",
