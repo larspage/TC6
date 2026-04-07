@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import MentionAutocomplete from './MentionAutocomplete';
+import DescriptionPreview from './DescriptionPreview';
 
 const inputStyle = {
   background: '#1E293B',
@@ -12,11 +13,34 @@ const inputStyle = {
   outline: 'none',
 };
 
-export default function DescriptionEditor({ value, onChange, nodes, token, mindmapId, nodeId, onNodeCreated, onConnectionsChanged }) {
+/**
+ * Description editor with @mention autocomplete and [[link]] preview.
+ *
+ * Props:
+ *   value, onChange         — controlled text value
+ *   nodes                   — allNodes array for mention search + link resolution
+ *   token, mindmapId, nodeId — TC6 auth/context for creating nodes + connections
+ *   onNodeCreated           — called with new node object after @-create
+ *   onConnectionsChanged    — called after mention connection is created
+ *   onNodeClick             — called with node._id when a [[link]] chip is clicked
+ */
+export default function DescriptionEditor({
+  value,
+  onChange,
+  nodes,
+  token,
+  mindmapId,
+  nodeId,
+  onNodeCreated,
+  onConnectionsChanged,
+  onNodeClick,
+}) {
   const [mentionQuery, setMentionQuery] = useState(null);
   const [mentionPos, setMentionPos] = useState(null);
   const [mentionStart, setMentionStart] = useState(null);
   const textareaRef = useRef(null);
+
+  const hasLinks = value && /\[\[/.test(value);
 
   const handleChange = (e) => {
     const text = e.target.value;
@@ -72,7 +96,6 @@ export default function DescriptionEditor({ value, onChange, nodes, token, mindm
     setMentionQuery(null);
     setMentionPos(null);
     setMentionStart(null);
-    // Restore cursor after insertion
     setTimeout(() => {
       if (textareaRef.current) {
         const pos = mentionStart + inserted.length;
@@ -91,7 +114,6 @@ export default function DescriptionEditor({ value, onChange, nodes, token, mindm
     try {
       const headers = { 'Content-Type': 'application/json', 'x-auth-token': token };
 
-      // Step 1: create the new node
       const nodeRes = await fetch('/api/nodes', {
         method: 'POST',
         headers,
@@ -100,7 +122,6 @@ export default function DescriptionEditor({ value, onChange, nodes, token, mindm
       if (!nodeRes.ok) return;
       const newNode = await nodeRes.json();
 
-      // Step 2: create the mention connection from current node to new node
       if (nodeId) {
         await fetch('/api/connections', {
           method: 'POST',
@@ -115,7 +136,6 @@ export default function DescriptionEditor({ value, onChange, nodes, token, mindm
         onConnectionsChanged?.();
       }
 
-      // Step 3: insert [[NodeTitle]] into the description
       const textarea = textareaRef.current;
       const cursor = textarea ? textarea.selectionStart : value.length;
       const before = value.slice(0, capturedMentionStart ?? cursor);
@@ -143,6 +163,13 @@ export default function DescriptionEditor({ value, onChange, nodes, token, mindm
         }}
         placeholder="Describe this thought… type @ to link to another node"
       />
+      {hasLinks && (
+        <DescriptionPreview
+          content={value}
+          nodes={nodes}
+          onNodeClick={onNodeClick}
+        />
+      )}
       {mentionQuery !== null && mentionPos && (
         <MentionAutocomplete
           query={mentionQuery}

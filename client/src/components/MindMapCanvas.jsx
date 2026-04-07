@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback, useReducer } from 'react';
 import * as d3 from 'd3';
 import { updateNode, searchNodes } from '../api.js';
-import DescriptionEditor from './DescriptionEditor.jsx';
+import DescriptionEditor from './editor/index.js';
 import LinksPanel from './LinksPanel.jsx';
 import { resolveFields, TYPE_DEFINITIONS, groupedTypes } from './type_definitions.js';
 
@@ -303,6 +303,7 @@ function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, on
           nodeId={node._id}
           onNodeCreated={onNodeCreated}
           onConnectionsChanged={onConnectionsChanged}
+          onNodeClick={onNodeClick}
         />
 
         <label style={label}>Tags (comma-separated)</label>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TYPE_DEFINITIONS } from './type_definitions.js';
+import { TYPE_DEFINITIONS } from '../type_definitions.js';
 
 export default function MentionAutocomplete({ query, nodes, position, onSelect, onCreate, onDismiss }) {
   const [highlighted, setHighlighted] = useState(0);

@@ -1,0 +1,252 @@
+# AI Prompt for Notetaker Service Integration
+
+You are an AI assistant tasked with integrating a Notetaker service into a consuming application. Use the following information to understand the service's capabilities and constraints.
+
+## Notetaker Service API
+
+**Base URL:** `http://localhost:3100`
+
+**Key Endpoints:**
+- `POST /api/notes`: Create a new note. Accepts optional `id` (UUID), `title`, `content`, and `outgoingLinks`. If `id` is missing, a new UUID is generated. `outgoingLinks` should be an array of objects with `linkText` and `targetNoteId`.
+- `PUT /api/notes/{id}`: Update an existing note by UUID.
+- `GET /api/notes`: Retrieve a list of all notes.
+- `GET /api/notes/{id}`: Retrieve a single note by UUID.
+- `GET /api/graph`: Retrieve all notes and links as a JSON graph object `{ notes: [{ id, title }], links: [{ source, target, text }] }`.
+
+**Wiki Linking:**
+- Notes can contain `[[Link Text]]` syntax.
+- The API automatically parses these into `outgoingLinks` when saving notes, mapping `Link Text` to the `id` of an existing note with a matching title (case-insensitive).
+- If a linked note title doesn't exist, it should ideally be created.
+
+**Data Structures:**
+- **Note:** `{ id: string, title: string, content?: string, outgoingLinks?: Array<{ linkText: string, targetNoteId: string }>, ... }`
+- **Graph:** `{ notes: Array<{ id: string, title: string }>, links: Array<{ source: string, target: string, text: string }> }`
+
+## Task
+
+Your goal is to help a developer integrate the Notetaker service into their primary application. Specifically, you need to guide them on how to:
+
+1.  **Create a new note** programmatically, potentially providing an external UUID and including links to existing notes.
+2.  **Fetch and display the graph data** to visualize note relationships.
+3.  **Parse and utilize the wiki link syntax** within note content.
+
+## Instructions for AI Agent
+
+**Context:** The consuming application is a productivity tool that needs to manage research notes, project documentation, or knowledge base articles.
+
+**Constraint Checklist & Confidence Score:**
+1. Can create a note with an external UUID? Yes.
+2. Can create a note with links? Yes, via `outgoingLinks` array.
+3. Can automatically create linked notes if they don't exist? The API supports finding existing notes by title for links, but doesn't automatically create *new* notes based on link text if they don't exist. This is a potential area for enhancement or a task for the consuming app.
+4. Can fetch all notes? Yes, `/api/notes`.
+5. Can fetch graph data? Yes, `/api/graph`.
+6. Does the API handle wiki syntax `[[Link Text]]` automatically? Yes, when notes are saved via the UI or API that correctly formats `outgoingLinks`.
+7. Is the Notetaker UI embeddable? Yes, via `/standalone`.
+
+Confidence Score: 5/5 - All core functionalities are covered.
+
+**Mental Sandbox Simulation:**
+- **Scenario 1: Creating a note with a link:**
+    - The AI would generate a `POST /api/notes` request.
+    - It needs to include the `id` (UUID) for the *target* note.
+    - It must format the `outgoingLinks` array correctly: `[{ linkText: "Target Note Title", targetNoteId: "target-note-uuid" }]`.
+    - The AI should instruct the developer to ensure the `targetNoteId` actually corresponds to an existing note's UUID. If the note doesn't exist, the link won't resolve correctly in the graph data.
+- **Scenario 2: Displaying the graph:**
+    - The AI would generate JavaScript code to `fetch('/api/graph')`.
+    - It would then process the JSON response, likely iterating through `notes` and `links` to render them. For visualization, it might suggest using a library like D3.js if a visual graph is desired (though the prompt only asks for displaying the data).
+- **Scenario 3: Handling wiki links:**
+    - The AI should explain that the wiki link syntax `[[Link Text]]` is primarily handled by the *Notetaker's UI* for automatic `outgoingLinks` generation during saves.
+    - For a *consuming app*, if it wants to *interpret* wiki links in notes fetched from the API, it would need its own client-side parsing logic (similar to what's in `NotetakerShell.tsx`) to make them clickable or otherwise interactive. The API itself doesn't automatically create new notes *just* from link text in a `POST` request; it matches existing ones.
+
+**Key Learnings from Sandbox:**
+- The distinction between how the Notetaker UI handles wiki links (creating `outgoingLinks` on save) and how a consuming app might interpret them (client-side parsing) is important.
+- The API relies on existing note UUIDs for `targetNoteId` in `outgoingLinks`. Consuming apps might need logic to check if a linked note exists before creating a link, or to create the target note first.
+
+**Strategizing complete.**
+
+## Developer Integration Guide
+
+This guide outlines how to integrate the Notetaker service into your application.
+
+### 1. Creating Notes Programmatically
+
+You can create notes via the `POST /api/notes` endpoint.
+
+**Creating a note with an external UUID and linking to an existing note:**
+
+```javascript
+async function createNoteWithLink(appContext) {
+  const { externalUuid, title, content, linkText, targetNoteId } = appContext;
+
+  const noteData = {
+    id: externalUuid, // Use your provided UUID
+    title: title,
+    content: content,
+    outgoingLinks: [
+      {
+        linkText: linkText,      // e.g., "First Note"
+        targetNoteId: targetNoteId // The UUID of the note you're linking to
+      }
+    ]
+  };
+
+  try {
+    const response = await fetch('http://localhost:3100/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(noteData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const newNote = await response.json();
+    console.log('Note created successfully:', newNote);
+    return newNote;
+  } catch (error) {
+    console.error('Failed to create note:', error);
+    return null;
+  }
+}
+
+// Example Usage:
+// Assume 'existingNoteId' is the UUID of "First Note"
+const existingNoteId = '64437ba9-9a47-440e-ae7b-ddd6087034fe'; 
+createNoteWithLink({
+  externalUuid: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', // Your custom UUID
+  title: 'Project Alpha Brief',
+  content: 'This project builds upon [[First Note]] and requires research on [[fake protestors]].',
+  linkText: 'First Note', // Text that appears in the link
+  targetNoteId: existingNoteId // UUID of "First Note"
+});
+```
+
+**Important:**
+- Ensure the `targetNoteId` you provide exists in the Notetaker service.
+- If the `id` field is omitted, the service will generate a new UUID.
+
+### 2. Fetching and Displaying Graph Data
+
+To get a complete overview of your notes and their relationships, use the `/api/graph` endpoint.
+
+```javascript
+async function displayNoteGraph() {
+  try {
+    const response = await fetch('http://localhost:3100/api/graph');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const graphData = await response.json();
+    
+    console.log('Notes Found:', graphData.notes.length);
+    console.log('Links Found:', graphData.links.length);
+    
+    // Example: Render notes and links in your UI
+    renderGraphData(graphData); 
+
+  } catch (error) {
+    console.error('Failed to fetch graph data:', error);
+  }
+}
+
+function renderGraphData(data) {
+  // Implement UI rendering logic here
+  // For example, display list of notes and links, or use a visualization library
+  
+  const notesList = document.getElementById('notes-list');
+  notesList.innerHTML = data.notes.map(n => 
+    `<li key="${n.id}">${n.title} (${n.id.substring(0, 8)}...)</li>`
+  ).join('');
+
+  const linksList = document.getElementById('links-list');
+  linksList.innerHTML = data.links.map(l => 
+    `<li key="${l.source}-${l.target}">${l.text} (From: ${l.source.substring(0, 8)}... -> To: ${l.target.substring(0, 8)}...)</li>`
+  ).join('');
+}
+
+// Call this function when you want to load/refresh the graph
+// displayNoteGraph(); 
+```
+
+### 3. Handling Wiki Links (`[[...]]`)
+
+The Notetaker service automatically handles wiki links (`[[Link Text]]`) when notes are created or updated via its own UI or API that correctly structures `outgoingLinks`.
+
+**For consuming applications:**
+- When you *fetch* a note with `content` containing `[[...]]`, the service doesn't automatically make these live links in your app's frontend.
+- You will need to implement client-side parsing to turn `[[Link Text]]` into interactive elements (e.g., clickable links that trigger navigation or fetching of the linked note). Look at the `PreviewContent` component in `/app/standalone/NotetakerShell.tsx` for an example of how this parsing can be done in React.
+
+This prompt is designed to give an AI enough information to:
+1.  Understand the Notetaker service's capabilities and limitations.
+2.  Generate code snippets for common integration tasks (creating notes, fetching data).
+3.  Guide developers on how to use the API and handle specific features like wiki links.
+4.  Identify potential areas where the consuming application needs to implement additional logic (e.g., client-side link parsing, creating missing linked notes).
+		
+```json
+{
+  "prompt_description": "AI Integration Guide for Notetaker Service API",
+  "service_api_base_url": "http://localhost:3100",
+  "endpoints": {
+    "create_note": {
+      "method": "POST",
+      "path": "/api/notes",
+      "description": "Creates a new note. Accepts optional external UUID, title, content, and outgoingLinks.",
+      "request_body_example": {
+        "id": "optional-external-uuid",
+        "title": "string",
+        "content": "string with [[wiki links]]",
+        "outgoingLinks": [{"linkText": "string", "targetNoteId": "uuid"}]
+      },
+      "response_body_example": "Note object with ID, title, etc."
+    },
+    "get_notes": {
+      "method": "GET",
+      "path": "/api/notes",
+      "description": "Retrieves a list of all notes.",
+      "response_body_example": "[Note object, ...]"
+    },
+    "get_note_by_id": {
+      "method": "GET",
+      "path": "/api/notes/{id}",
+      "description": "Retrieves a single note by its UUID."
+    },
+     "update_note": {
+      "method": "PUT",
+      "path": "/api/notes/{id}",
+      "description": "Updates an existing note by UUID. Handles outgoing links based on content or provided links."
+    },
+    "get_graph": {
+      "method": "GET",
+      "path": "/api/graph",
+      "description": "Retrieves all notes and their links in a graph format.",
+      "response_body_example": "{ notes: [{ id, title }], links: [{ source, target, text }] }"
+    }
+  },
+  "features": {
+    "uuid_based_ids": "Notes use UUIDs for stable references.",
+    "wiki_links": {
+      "syntax": "[[Link Text]]",
+      "behavior": "Automatic parsing into outgoingLinks on save (UI/API).",
+      "consuming_app_consideration": "Client-side parsing needed to make links interactive in fetched notes."
+    },
+    "link_structure": "outgoingLinks: [{ linkText: string, targetNoteId: string }]",
+    "graph_data": "Provides a complete overview of notes and relationships.",
+    "embeddable_ui": "Available at /standalone route."
+  },
+  "developer_tasks": [
+    "Implement API calls for note creation/retrieval/update.",
+    "Use GET /api/graph to fetch and potentially visualize note relationships.",
+    "Implement client-side parsing for wiki links in fetched content if interactive links are needed.",
+    "Ensure correct formatting of outgoingLinks when creating/updating notes, especially targetNoteId.",
+    "Handle potential "note not found" errors for links.",
+    "Consider creating target notes if they don't exist when parsing wiki links."
+  ],
+  "example_api_call_create_note": {
+    "description": "Create a note with an external UUID and a link.",
+    "code": "fetch('http://localhost:3100/api/notes', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    id: 'your-external-uuid',\n    title: 'My New Note',\n    content: 'This links to [[Existing Note Title]]',\n    outgoingLinks: [{ linkText: 'Existing Note Title', targetNoteId: 'existing-note-uuid' }]\n  })\n});"
+  },
+  "example_api_call_fetch_graph": {
+    "description": "Fetch graph data for visualization.",
+    "code": "fetch('http://localhost:3100/api/graph').then(res => res.json()).then(graphData => console.log(graphData));"
+  }
+}
