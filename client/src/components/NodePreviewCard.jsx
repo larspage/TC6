@@ -34,7 +34,7 @@ export default function NodePreviewCard({ node, position, onClick }) {
       }}
     >
       <div style={{ fontWeight: 700, fontSize: 13, color: '#fff', marginBottom: 5 }}>
-        {node.text}
+        {node.title}
       </div>
       {node.thought_type && (
         <div style={{

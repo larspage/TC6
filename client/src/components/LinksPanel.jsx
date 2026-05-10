@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import NodePreviewCard from './NodePreviewCard';
+import { CONNECTION_TYPES, getTypeDef, groupTypesByCategory } from './connection_types';
 
 const labelStyle = {
   color: '#64748B',
@@ -20,12 +21,34 @@ const inputStyle = {
   outline: 'none',
 };
 
+const selectStyle = {
+  ...inputStyle,
+  fontSize: 11,
+  padding: '5px 8px',
+  cursor: 'pointer',
+};
+
 const divider = {
   borderTop: '1px solid #1E293B',
   margin: '8px 0',
 };
 
-function NodeChip({ label, onClick, onDelete, onMouseEnter, onMouseLeave }) {
+function TypeDot({ color, size = 8 }) {
+  return (
+    <span style={{
+      display: 'inline-block',
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      background: color,
+      flexShrink: 0,
+    }} />
+  );
+}
+
+function NodeChip({ label, onClick, onDelete, onMouseEnter, onMouseLeave, typeKey, showTypePicker }) {
+  const td = getTypeDef(typeKey);
+  const [showMenu, setShowMenu] = useState(false);
   return (
     <div
       style={{
@@ -37,14 +60,16 @@ function NodeChip({ label, onClick, onDelete, onMouseEnter, onMouseLeave }) {
         borderRadius: 6,
         padding: '4px 8px',
         cursor: 'pointer',
+        position: 'relative',
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
+      <TypeDot color={td.color} />
       <span
         onClick={onClick}
         style={{
-          maxWidth: 90,
+          maxWidth: 80,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
@@ -56,6 +81,21 @@ function NodeChip({ label, onClick, onDelete, onMouseEnter, onMouseLeave }) {
       >
         {label}
       </span>
+      {showTypePicker && (
+        <span
+          onClick={(e) => { e.stopPropagation(); setShowMenu(s => !s); }}
+          style={{
+            fontSize: 9,
+            color: td.color,
+            cursor: 'pointer',
+            padding: '0 2px',
+            whiteSpace: 'nowrap',
+          }}
+          title={td.description}
+        >
+          {td.label}
+        </span>
+      )}
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -75,7 +115,80 @@ function NodeChip({ label, onClick, onDelete, onMouseEnter, onMouseLeave }) {
           ✕
         </button>
       )}
+      {showMenu && showTypePicker && (
+        <TypeMenu
+          onSelect={(key) => { showTypePicker(key); setShowMenu(false); }}
+          onClose={() => setShowMenu(false)}
+        />
+      )}
     </div>
+  );
+}
+
+function TypeMenu({ onSelect, onClose }) {
+  const groups = groupTypesByCategory();
+  const CATEGORY_LABELS = {
+    structure: 'Structure',
+    causality: 'Causality & Logic',
+    sequence: 'Sequence & Dependency',
+    semantic: 'Semantic',
+    meta: 'Meta',
+  };
+  return (
+    <>
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+        onClick={onClose}
+      />
+      <div style={{
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        zIndex: 1000,
+        background: '#0F172A',
+        border: '1px solid #334155',
+        borderRadius: 6,
+        minWidth: 180,
+        padding: '4px 0',
+        marginTop: 2,
+      }}>
+        {Object.entries(groups).map(([cat, types]) => (
+          <div key={cat}>
+            <div style={{
+              fontSize: 9,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: '#64748B',
+              padding: '6px 10px 2px',
+            }}>
+              {CATEGORY_LABELS[cat] || cat}
+            </div>
+            {types.map(t => (
+              <div
+                key={t.key}
+                onClick={() => onSelect(t.key)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  color: '#E2E8F0',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1E3A5F'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                title={t.description}
+              >
+                <TypeDot color={t.color} size={6} />
+                {t.label}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -86,6 +199,7 @@ export default function LinksPanel({ nodeId, mindmapId, token, allNodes, onNodeC
   const [refreshKey, setRefreshKey] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
+  const [selectedType, setSelectedType] = useState('related');
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [hoverPos, setHoverPos] = useState(null);
 
@@ -131,10 +245,27 @@ export default function LinksPanel({ nodeId, mindmapId, token, allNodes, onNodeC
         .filter(n =>
           n._id !== nodeId &&
           !outboundNodeIds.has(n._id) &&
-          n.text.toLowerCase().includes(pickerQuery.toLowerCase())
+          n.title.toLowerCase().includes(pickerQuery.toLowerCase())
         )
         .slice(0, 10)
     : [];
+
+  const handleTypeChange = async (connectionId, newType) => {
+    try {
+      await fetch(`/api/connections/${connectionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': token,
+        },
+        body: JSON.stringify({ connection_type: newType }),
+      });
+      setRefreshKey(k => k + 1);
+      onConnectionsChanged();
+    } catch {
+      // silent fail
+    }
+  };
 
   const handleAddLink = async (targetNode) => {
     try {
@@ -148,7 +279,7 @@ export default function LinksPanel({ nodeId, mindmapId, token, allNodes, onNodeC
           mindmap_id: mindmapId,
           from_node_id: nodeId,
           to_node_id: targetNode._id,
-          connection_type: 'manual',
+          connection_type: selectedType,
         }),
       });
       setPickerOpen(false);
@@ -191,7 +322,8 @@ export default function LinksPanel({ nodeId, mindmapId, token, allNodes, onNodeC
               return (
                 <NodeChip
                   key={conn._id}
-                  label={node.text}
+                  label={node.title}
+                  typeKey={conn.connection_type}
                   onClick={() => onNodeClick(node._id)}
                   onMouseEnter={(e) => {
                     setHoveredNodeId(node._id);
@@ -252,9 +384,11 @@ export default function LinksPanel({ nodeId, mindmapId, token, allNodes, onNodeC
               return (
                 <NodeChip
                   key={conn._id}
-                  label={node.text}
+                  label={node.title}
+                  typeKey={conn.connection_type}
                   onClick={() => onNodeClick(node._id)}
                   onDelete={() => handleDelete(conn._id)}
+                  showTypePicker={(newType) => handleTypeChange(conn._id, newType)}
                   onMouseEnter={(e) => {
                     setHoveredNodeId(node._id);
                     setHoverPos({ x: e.clientX, y: e.clientY });
@@ -268,13 +402,34 @@ export default function LinksPanel({ nodeId, mindmapId, token, allNodes, onNodeC
 
         {pickerOpen && (
           <div>
-            <input
-              autoFocus
-              value={pickerQuery}
-              onChange={e => setPickerQuery(e.target.value)}
-              placeholder="Search nodes…"
-              style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 4 }}
-            />
+            <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+              <select
+                value={selectedType}
+                onChange={e => setSelectedType(e.target.value)}
+                style={{ ...selectStyle, flex: '0 0 auto', maxWidth: 130 }}
+              >
+                {Object.entries(groupTypesByCategory()).map(([cat, types]) => (
+                  <optgroup key={cat} label={{
+                    structure: 'Structure',
+                    causality: 'Causality & Logic',
+                    sequence: 'Sequence & Dependency',
+                    semantic: 'Semantic',
+                    meta: 'Meta',
+                  }[cat] || cat}>
+                    {types.map(t => (
+                      <option key={t.key} value={t.key}>{t.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <input
+                autoFocus
+                value={pickerQuery}
+                onChange={e => setPickerQuery(e.target.value)}
+                placeholder="Search nodes…"
+                style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+              />
+            </div>
             {pickerResults.length > 0 && (
               <div style={{
                 background: '#0F172A',
@@ -296,7 +451,7 @@ export default function LinksPanel({ nodeId, mindmapId, token, allNodes, onNodeC
                     onMouseEnter={e => { e.currentTarget.style.background = '#1E3A5F'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                   >
-                    {node.text}
+                    {node.title}
                   </div>
                 ))}
               </div>

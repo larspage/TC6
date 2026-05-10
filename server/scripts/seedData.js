@@ -78,7 +78,7 @@ async function seed() {
   // ─── Level 0: Root ─────────────────────────────────────────────────────────
   const root = await Node.create({
     mindmap_id:   mid,
-    text:         'Innovation Hub',
+    title:         'Innovation Hub',
     position:     { x: CX, y: CY },
     styling:      { color: '#6366f1', shape: 'circle', width: 150, height: 150 },
     level:        0,
@@ -107,7 +107,7 @@ async function seed() {
   for (let i = 0; i < 4; i++) {
     l1.push(await Node.create({
       mindmap_id:   mid,
-      text:         l1Labels[i],
+      title:         l1Labels[i],
       position:     l1Pos[i],
       styling:      { color: L1_COLORS[i], shape: 'rounded', width: 130, height: 52 },
       parent_id:    root._id,
@@ -143,7 +143,7 @@ async function seed() {
     for (let j = 0; j < 3; j++) {
       l2[i].push(await Node.create({
         mindmap_id: mid,
-        text:       l2Labels[i][j],
+        title:       l2Labels[i][j],
         position:   positions[j],
         styling:    { color: L2_COLORS[i], shape: 'rounded', width: 140, height: 46 },
         parent_id:  l1[i]._id,
@@ -191,7 +191,7 @@ async function seed() {
       for (let k = 0; k < 2; k++) {
         pair.push(await Node.create({
           mindmap_id: mid,
-          text:       l3Labels[labelIdx][k],
+          title:       l3Labels[labelIdx][k],
           position:   positions[k],
           styling:    { color: '#06b6d4', shape: 'rounded', width: 140, height: 42 },
           parent_id:  parent._id,
@@ -223,7 +223,7 @@ async function seed() {
     for (let k = 0; k < 2; k++) {
       pair.push(await Node.create({
         mindmap_id: mid,
-        text:       l4Labels[i][k],
+        title:       l4Labels[i][k],
         position:   positions[k],
         styling:    { color: '#84cc16', shape: 'rounded', width: 140, height: 42 },
         parent_id:  parent._id,
@@ -258,38 +258,38 @@ async function seed() {
   const SLATE  = '#64748b';
 
   // Tech ↔ Market: UX Design ↔ Customer Research
-  await link(mid, l2[0][2], l2[3][0], 'manual', 'dashed', AMBER);
+  await link(mid, l2[0][2], l2[3][0], 'related', 'dashed', AMBER);
 
   // UX Research ↔ User Interviews (L3)
-  await link(mid, l3[2][0], l3[9][0], 'manual', 'dashed', AMBER);
+  await link(mid, l3[2][0], l3[9][0], 'related', 'dashed', AMBER);
   // Prototyping ↔ Survey Design (L3)
-  await link(mid, l3[2][1], l3[9][1], 'manual', 'dashed', AMBER);
+  await link(mid, l3[2][1], l3[9][1], 'related', 'dashed', AMBER);
 
   // ML Model Training ↔ Scalability Planning (Tech internal, L3)
-  await link(mid, l3[0][0], l3[1][0], 'manual', 'dashed', PURPLE);
+  await link(mid, l3[0][0], l3[1][0], 'related', 'dashed', PURPLE);
   // Data Pipeline ↔ Cost Optimisation
-  await link(mid, l3[0][1], l3[1][1], 'manual', 'dashed', PURPLE);
+  await link(mid, l3[0][1], l3[1][1], 'related', 'dashed', PURPLE);
 
   // Compliance ↔ Mitigation Strategies (Strategy internal)
-  await link(mid, l3[4][1], l3[4][0], 'manual', 'dotted', RED);
+  await link(mid, l3[4][1], l3[4][0], 'related', 'dotted', RED);
 
   // Enterprise Sales ↔ Market Expansion (Strategy ↔ Market, L3)
-  await link(mid, l3[5][1], l3[3][0], 'manual', 'dashed', ORANGE);
+  await link(mid, l3[5][1], l3[3][0], 'related', 'dashed', ORANGE);
 
   // Hiring Pipeline ↔ Onboarding (People internal, L3)
-  await link(mid, l3[6][0], l3[6][1], 'manual', 'dotted', GREEN);
+  await link(mid, l3[6][0], l3[6][1], 'related', 'dotted', GREEN);
   // Mentorship Programs ↔ Diversity & Inclusion (People cross, L3)
-  await link(mid, l3[8][0], l3[7][1], 'manual', 'dashed', GREEN);
+  await link(mid, l3[8][0], l3[7][1], 'related', 'dashed', GREEN);
 
   // SWOT Analysis ↔ Mitigation Strategies (Market ↔ Strategy, L3)
-  await link(mid, l3[10][0], l3[4][0], 'manual', 'dashed', ORANGE);
+  await link(mid, l3[10][0], l3[4][0], 'related', 'dashed', ORANGE);
 
   // Feature Engineering ↔ ETL Processes (L4 cross)
-  await link(mid, l4[0][0], l4[1][0], 'manual', 'dashed', SLATE);
+  await link(mid, l4[0][0], l4[1][0], 'related', 'dashed', SLATE);
   // Dashboard Design ↔ Metrics Definition (L4 siblings)
-  await link(mid, l4[2][0], l4[3][1], 'manual', 'dashed', SLATE);
+  await link(mid, l4[2][0], l4[3][1], 'related', 'dashed', SLATE);
   // Model Evaluation ↔ KPI Tracking (L4 ↔ L3)
-  await link(mid, l4[0][1], l3[3][1], 'manual', 'dotted', SLATE);
+  await link(mid, l4[0][1], l3[3][1], 'related', 'dotted', SLATE);
 
   // ─── Summary ───────────────────────────────────────────────────────────────
   const nodeCount = await Node.countDocuments({ mindmap_id: mid });

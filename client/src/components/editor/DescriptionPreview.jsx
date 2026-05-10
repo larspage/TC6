@@ -26,7 +26,7 @@ export default function DescriptionPreview({ content, nodes, onNodeClick }) {
 
     const linkText = match[1];
     const targetNode = nodes?.find(
-      n => n.text.toLowerCase() === linkText.toLowerCase()
+      n => n.title.toLowerCase() === linkText.toLowerCase()
     );
 
     parts.push(

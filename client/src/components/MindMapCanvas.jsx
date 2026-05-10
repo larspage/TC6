@@ -4,6 +4,7 @@ import { updateNode, searchNodes } from '../api.js';
 import DescriptionEditor from './editor/index.js';
 import LinksPanel from './LinksPanel.jsx';
 import { resolveFields, TYPE_DEFINITIONS, groupedTypes } from './type_definitions.js';
+import { getTypeDef } from './connection_types.js';
 
 // ─── Node dimensions by hop distance from active thought ─────────────────────
 const HOP_STYLE = {
@@ -76,7 +77,7 @@ function Tooltip({ node, pos }) {
       boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(66,180,230,0.2)',
       fontFamily: "'Inter','Segoe UI',sans-serif", fontSize: 12, lineHeight: 1.5,
     }}>
-      <div style={{ fontWeight: 700, fontSize: 13, color: '#fff', marginBottom: 5 }}>{node.text}</div>
+      <div style={{ fontWeight: 700, fontSize: 13, color: '#fff', marginBottom: 5 }}>{node.title}</div>
       {node.thought_type && (
         <div style={{ color: typeColor, fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           {typeLabel}
@@ -163,7 +164,7 @@ function TypeFieldInput({ field, value, onChange, inputStyle }) {
 
 // ─── Edit panel ───────────────────────────────────────────────────────────────
 function EditPanel({ node, token, mindmapId, allNodes, onSave, onNodeCreated, onNodeClick, onConnectionsChanged, onSaveStart, onSaveEnd }) {
-  const [text, setText]           = useState(node.text);
+  const [text, setText]           = useState(node.title);
   const [type, setType]           = useState(node.thought_type || 'idea');
   const [desc, setDesc]           = useState(node.description || '');
   const [tags, setTags]           = useState((node.tags || []).join(', '));
@@ -701,13 +702,16 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
                 const hopA = hopMap.get(c.from_node_id) ?? 2;
                 const hopB = hopMap.get(c.to_node_id)   ?? 2;
                 const minH = Math.min(hopA, hopB);
-                const stroke  = minH === 0 ? '#42B4E6' : minH === 1 ? '#4A7DB5' : '#334155';
-                const opacity = minH === 0 ? 0.8        : minH === 1 ? 0.5        : 0.3;
-                const sw      = minH === 0 ? 2          : minH === 1 ? 1.5        : 1;
+                // Base opacity by hop distance (dimmer for farther nodes)
+                const hopOpacity = minH === 0 ? 0.8 : minH === 1 ? 0.5 : 0.3;
+                // Connection type styling
+                const td = getTypeDef(c.connection_type);
+                const strokeDash = td.style === 'dashed' ? '6,4' : td.style === 'dotted' ? '2,3' : undefined;
                 return (
                   <line key={c._id}
                     x1={from.x} y1={from.y} x2={to.x} y2={to.y}
-                    stroke={stroke} strokeWidth={sw} opacity={opacity}
+                    stroke={td.color} strokeWidth={2} opacity={hopOpacity}
+                    strokeDasharray={strokeDash}
                   />
                 );
               })}
@@ -716,7 +720,7 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
               {renderNodes.map(n => {
                 const s        = hopStyle(n.hop);
                 const isActive = n._id === activeNodeId;
-                const textLines = wrapText(n.text, s.w - 28, s.fs);
+                const textLines = wrapText(n.title, s.w - 28, s.fs);
                 const tagLine   = isActive && n.tags?.length
                   ? n.tags.slice(0, 4).join(' · ')
                   : null;

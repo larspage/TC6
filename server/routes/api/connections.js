@@ -74,23 +74,13 @@ router.post(
 );
 
 // @route   PUT api/connections/:id
-// @desc    Update a connection's styling
+// @desc    Update a connection's type and/or styling
 // @access  Private
 router.put(
   '/:id',
-  [
-    auth,
-    [
-      check('styling', 'Styling object is required').not().isEmpty()
-    ]
-  ],
+  auth,
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { styling } = req.body;
+    const { connection_type, styling } = req.body;
 
     try {
       let connection = await Connection.findById(req.params.id);
@@ -104,9 +94,13 @@ router.put(
         return res.status(401).json({ msg: 'User not authorized' });
       }
 
+      const updateFields = {};
+      if (connection_type) updateFields.connection_type = connection_type;
+      if (styling)        updateFields.styling        = styling;
+
       connection = await Connection.findByIdAndUpdate(
         req.params.id,
-        { $set: { styling } },
+        { $set: updateFields },
         { new: true }
       );
 
@@ -174,7 +168,7 @@ router.get('/node/:node_id', auth, async (req, res) => {
         { from_node_id: req.params.node_id },
         { to_node_id: req.params.node_id }
       ],
-      connection_type: { $in: ['manual', 'mention'] }
+      // All connection types included — no type filter
     });
 
     const inbound = connections.filter(

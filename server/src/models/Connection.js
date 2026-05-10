@@ -19,8 +19,19 @@ const ConnectionSchema = new Schema({
   },
   connection_type: {
     type: String,
-    enum: ['parent-child', 'manual', 'mention'],
-    default: 'manual'
+    enum: [
+      // Structure
+      'parent-child', 'related', 'part_of',
+      // Causality & Logic
+      'causes', 'supports', 'contradicts', 'questions',
+      // Sequence & Dependency
+      'precedes', 'depends_on', 'blocks',
+      // Semantic
+      'similar', 'opposite', 'expands_on', 'references',
+      // Meta
+      'duplicate', 'mention',
+    ],
+    default: 'related'
   },
   styling: {
     color: {

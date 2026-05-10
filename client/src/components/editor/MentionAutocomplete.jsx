@@ -5,7 +5,7 @@ export default function MentionAutocomplete({ query, nodes, position, onSelect, 
   const [highlighted, setHighlighted] = useState(0);
 
   const matches = query.length > 0
-    ? nodes.filter(n => n.text.toLowerCase().includes(query.toLowerCase()))
+    ? nodes.filter(n => n.title.toLowerCase().includes(query.toLowerCase()))
     : [];
 
   // Build items before hooks so effects can use it — but ALL hooks must be called unconditionally
@@ -110,7 +110,7 @@ export default function MentionAutocomplete({ query, nodes, position, onSelect, 
               background: typeColor, flexShrink: 0,
             }} />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {item.node.text}
+              {item.node.title}
             </span>
           </div>
         );

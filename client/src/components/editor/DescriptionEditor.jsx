@@ -90,7 +90,7 @@ export default function DescriptionEditor({
     const cursor = textarea.selectionStart;
     const before = value.slice(0, mentionStart);
     const after = value.slice(cursor);
-    const inserted = `[[${node.text}]]`;
+    const inserted = `[[${node.title}]]`;
     const newValue = before + inserted + after;
     onChange(newValue);
     setMentionQuery(null);
