@@ -33,9 +33,25 @@ const ConnectionSchema = new Schema({
       type: String,
       enum: ['solid', 'dashed', 'dotted']
     }
-  }
+  },
+  // ── Privacy tier (canonical doc: data tiers) ─────────────────────────────
+  privacy_tier: {
+    type: Number,
+    enum: [1, 2, 3],
+    default: 1,
+  },
+  // ── Soft-delete (canonical doc: soft-delete state) ────────────────────────
+  is_deleted: {
+    type: Boolean,
+    default: false,
+  },
+  deleted_at: {
+    type: Date,
+    default: null,
+  },
 }, { timestamps: true });
 
 ConnectionSchema.index({ mindmap_id: 1 });
+ConnectionSchema.index({ mindmap_id: 1, is_deleted: 1 });
 
 module.exports = mongoose.model('Connection', ConnectionSchema);

@@ -34,9 +34,19 @@ const MindMapSchema = new Schema({
       type: Number,
       default: 0
     }
-  }
+  },
+  // ── Soft-delete (canonical doc: soft-delete state) ────────────────────────
+  is_deleted: {
+    type: Boolean,
+    default: false,
+  },
+  deleted_at: {
+    type: Date,
+    default: null,
+  },
 }, { timestamps: true });
 
 MindMapSchema.index({ user_id: 1 });
+MindMapSchema.index({ user_id: 1, is_deleted: 1 });
 
 module.exports = mongoose.model('MindMap', MindMapSchema);

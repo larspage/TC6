@@ -34,7 +34,7 @@ router.get('/:mindmap_id/fullsearch', auth, async (req, res) => {
       } else {
         const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         regex = new RegExp(escaped, 'i');
-        query.$or = [{ text: regex }, { description: regex }];
+        query.$or = [{ title: regex }, { description: regex }];
       }
     }
 
@@ -70,11 +70,11 @@ router.get('/:mindmap_id/fullsearch', auth, async (req, res) => {
     const annotated = results
       .map(n => ({
         _id: n._id,
-        text: n.text,
+        title: n.title,
         description: n.description,
         thought_type: n.thought_type,
         type_data: n.type_data,
-        matchedInTitle: regex ? regex.test(n.text) : (q ? n.text.toLowerCase().includes(q.toLowerCase()) : true),
+        matchedInTitle: regex ? regex.test(n.title) : (q ? n.title.toLowerCase().includes(q.toLowerCase()) : true),
       }))
       .sort((a, b) => {
         if (a.matchedInTitle && !b.matchedInTitle) return -1;
@@ -114,7 +114,7 @@ router.get('/:mindmap_id/search', auth, async (req, res) => {
 
     const count = await Node.countDocuments({
       mindmap_id: req.params.mindmap_id,
-      text: { $regex: q, $options: 'i' }
+      title: { $regex: q, $options: 'i' }
     });
 
     if (count > 10) {
@@ -123,8 +123,8 @@ router.get('/:mindmap_id/search', auth, async (req, res) => {
 
     const nodes = await Node.find({
       mindmap_id: req.params.mindmap_id,
-      text: { $regex: q, $options: 'i' }
-    }).select('_id text thought_type description');
+      title: { $regex: q, $options: 'i' }
+    }).select('_id title thought_type description');
 
     res.json(nodes);
   } catch (err) {
@@ -231,17 +231,21 @@ router.put(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { text, position, styling, description, tags, thought_type, type_data } = req.body;
+    const { title, position, styling, description, tags, thought_type, type_data, due_date, task_status, review_marker, privacy_tier } = req.body;
 
     // Build node object
     const nodeFields = {};
-    if (text) nodeFields.text = text;
+    if (title) nodeFields.title = title;
     if (position) nodeFields.position = position;
     if (styling) nodeFields.styling = styling;
     if (description !== undefined) nodeFields.description = description;
     if (tags !== undefined) nodeFields.tags = tags;
     if (thought_type) nodeFields.thought_type = thought_type;
     if (type_data !== undefined) nodeFields.type_data = type_data;
+    if (due_date !== undefined) nodeFields.due_date = due_date;
+    if (task_status !== undefined) nodeFields.task_status = task_status;
+    if (review_marker !== undefined) nodeFields.review_marker = review_marker;
+    if (privacy_tier !== undefined) nodeFields.privacy_tier = privacy_tier;
     nodeFields.updated_at = Date.now();
 
     try {
@@ -257,8 +261,8 @@ router.put(
       }
 
       // If title changed, update [[OldTitle]] → [[NewTitle]] in all descriptions in this mindmap
-      const oldTitle = node.text;
-      const newTitle = nodeFields.text;
+      const oldTitle = node.title;
+      const newTitle = nodeFields.title;
       if (newTitle && newTitle !== oldTitle) {
         const oldRef = `[[${oldTitle}]]`;
         const newRef = `[[${newTitle}]]`;

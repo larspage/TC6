@@ -38,6 +38,12 @@ const UserSchema = new Schema({
       type: Number,
       default: 5000
     }
+  },
+  // ── Vault / portability settings (canonical doc: survival design) ─────────
+  vault_settings: {
+    export_enabled: { type: Boolean, default: true },
+    recovery_phrase: { type: String, default: null },   // stored encrypted client-side
+    ai_tier_default: { type: Number, enum: [1, 2, 3], default: 1 },
   }
 });
 

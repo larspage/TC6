@@ -7,11 +7,12 @@ const NodeSchema = new Schema({
     ref: 'MindMap',
     required: true
   },
-  text: {
+  title: {
     type: String,
-    required: [true, 'Node text is required'],
-    minlength: [1, 'Node text must be at least 1 character long'],
-    maxlength: [500, 'Node text cannot be more than 500 characters long']
+    required: [true, 'Node title is required'],
+    minlength: [1, 'Node title must be at least 1 character long'],
+    maxlength: [500, 'Node title cannot be more than 500 characters long'],
+    trim: true,
   },
   position: {
     x: {
@@ -48,6 +49,7 @@ const NodeSchema = new Schema({
   },
   thought_type: {
     type: String,
+    enum: ['idea', 'task', 'note', 'question'],
     default: 'idea',
   },
   type_data: {
@@ -64,13 +66,45 @@ const NodeSchema = new Schema({
     type: [String],
     default: [],
   },
+  // ── Task fields (canonical doc: task) ────────────────────────────────────
+  due_date: {
+    type: Date,
+    default: null,
+  },
+  task_status: {
+    type: String,
+    enum: ['pending', 'active', 'completed'],
+    default: 'pending',
+  },
+  review_marker: {
+    type: Boolean,
+    default: false,
+  },
+  // ── Privacy tier (canonical doc: data tiers) ─────────────────────────────
+  privacy_tier: {
+    type: Number,
+    enum: [1, 2, 3],
+    default: 1,
+  },
+  // ── Soft-delete (canonical doc: soft-delete state) ────────────────────────
+  is_deleted: {
+    type: Boolean,
+    default: false,
+  },
+  deleted_at: {
+    type: Date,
+    default: null,
+  },
 }, { timestamps: true });
 
 NodeSchema.index({ mindmap_id: 1 });
 NodeSchema.index({ mindmap_id: 1, parent_id: 1 });
+NodeSchema.index({ mindmap_id: 1, is_deleted: 1 });
 NodeSchema.index(
-  { text: 'text', description: 'text' },
-  { weights: { text: 10, description: 1 }, default_language: 'english' }
+  { title: 'text', description: 'text', tags: 'text' },
+  { weights: { title: 10, description: 1 }, default_language: 'english' }
 );
+NodeSchema.index({ due_date: 1 });
+NodeSchema.index({ task_status: 1 });
 
 module.exports = mongoose.model('Node', NodeSchema);
