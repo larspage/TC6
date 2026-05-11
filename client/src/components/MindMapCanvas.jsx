@@ -4,7 +4,7 @@ import { updateNode, searchNodes } from '../api.js';
 import DescriptionEditor from './editor/index.js';
 import LinksPanel from './LinksPanel.jsx';
 import { resolveFields, TYPE_DEFINITIONS, groupedTypes } from './type_definitions.js';
-import { getTypeDef } from './connection_types.js';
+import { getTypeDef, groupTypesByCategory } from './connection_types.js';
 
 // ─── Node dimensions by hop distance from active thought ─────────────────────
 const HOP_STYLE = {
@@ -61,6 +61,70 @@ function wrapText(text, maxW, fs) {
   }
   if (cur) lines.push(cur);
   return lines.slice(0, 2);
+}
+
+// ─── Collapsible edge type legend ───────────────────────────────────────────
+function Legend({ open, onToggle }) {
+  const groups = groupTypesByCategory();
+  const CAT_LABELS = {
+    structure: 'Structure',
+    causality: 'Causality & Logic',
+    sequence:  'Sequence & Dependency',
+    semantic:  'Semantic',
+    meta:      'Meta',
+  };
+  if (!open) {
+    return (
+      <div
+        onClick={onToggle}
+        style={{
+          position: 'absolute', bottom: 16, right: 16, zIndex: 50,
+          background: '#1E293B', border: '1px solid #334155', borderRadius: 6,
+          padding: '5px 10px', cursor: 'pointer',
+          color: '#42B4E6', fontSize: 11, fontFamily: "'Inter','Segoe UI',sans-serif",
+          userSelect: 'none',
+        }}
+        title="Show legend"
+      >
+        Legend ⟡
+      </div>
+    );
+  }
+  return (
+    <div style={{
+      position: 'absolute', bottom: 16, right: 16, zIndex: 50,
+      background: '#0F172A', border: '1px solid #334155', borderRadius: 8,
+      padding: '10px 14px', maxHeight: 260, overflowY: 'auto',
+      fontFamily: "'Inter','Segoe UI',sans-serif", fontSize: 11,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+      minWidth: 170,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <span style={{ color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}>
+          Edge Types
+        </span>
+        <span onClick={onToggle} style={{ color: '#64748B', cursor: 'pointer', fontSize: 13, lineHeight: 1 }}>✕</span>
+      </div>
+      {Object.entries(groups).map(([cat, types]) => (
+        <div key={cat} style={{ marginBottom: 6 }}>
+          <div style={{ color: '#475569', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+            {CAT_LABELS[cat] || cat}
+          </div>
+          {types.map(t => (
+            <div key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0', color: '#CBD5E0' }}>
+              <svg width="14" height="6" style={{ flexShrink: 0 }}>
+                <line x1="0" y1="3" x2="14" y2="3"
+                  stroke={t.color} strokeWidth="2"
+                  strokeDasharray={t.style === 'dashed' ? '4,2' : t.style === 'dotted' ? '1.5,2' : undefined}
+                />
+              </svg>
+              <span>{t.label}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ─── Hover tooltip (HTML overlay) ────────────────────────────────────────────
@@ -359,6 +423,7 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
   const [searchResults, setSearchResults]     = useState([]);
   const [searchLoading, setSearchLoading]     = useState(false);
   const [advancedOpen, setAdvancedOpen]       = useState(false);
+  const [legendOpen, setLegendOpen]           = useState(false);
   const [searchMode, setSearchMode]           = useState('regex');
   const [searchType, setSearchType]           = useState('');
   const [searchFields, setSearchFields]       = useState({});
@@ -777,6 +842,8 @@ export default function MindMapCanvas({ nodes, connections, token, mindmapId, on
         </div>
 
         <Tooltip node={hoveredNode} pos={tooltipPos} />
+
+        <Legend open={legendOpen} onToggle={() => setLegendOpen(o => !o)} />
 
         {/* Hint */}
         <div style={{
